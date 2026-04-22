@@ -8,7 +8,19 @@
     "build": "tsc && vp build",
     "preview": "vp preview"
   },
+  "dependencies": {
+    "@wterm/dom": "catalog:",
+    "@wterm/react": "catalog:",
+    "node-pty": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "ws": "catalog:"
+  },
   "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "catalog:",
     "typescript": "~6.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:"

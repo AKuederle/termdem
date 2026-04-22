@@ -3,14 +3,28 @@ packages:
   - packages/*
   - tools/*
 
-catalogMode: prefer
-
 catalog:
   "@types/node": ^24
+  "@types/react": ^19.2.14
+  "@types/react-dom": ^19.2.3
+  "@vitejs/plugin-react": ^6.0.1
+  "@wterm/dom": ^0.1.9
+  "@wterm/react": ^0.1.9
+  agent-browser: ^0.26.0
+  node-pty: ^1.1.0
+  react: ^19.2.5
+  react-dom: ^19.2.5
   typescript: ^5
   vite: npm:@voidzero-dev/vite-plus-core@latest
-  vitest: npm:@voidzero-dev/vite-plus-test@latest
   vite-plus: latest
+  vitest: npm:@voidzero-dev/vite-plus-test@latest
+  ws: ^8.20.0
+
+catalogMode: prefer
+
+onlyBuiltDependencies:
+  - agent-browser
+  - node-pty
 overrides:
   vite: "catalog:"
   vitest: "catalog:"

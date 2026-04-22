@@ -15,6 +15,7 @@ export type PaneSessionOptions = {
 
 export interface PaneSession extends PaneController {
   close(): Promise<void>;
+  resize(cols: number, rows: number): Promise<void>;
 }
 
 type PendingExec = {
@@ -113,6 +114,12 @@ class NodePtyPaneSession implements PaneSession {
       this.pty.write(buildExecShellCommand(command, pending.id));
       this.pty.write("\r");
       return pending.result;
+    });
+  }
+
+  async resize(cols: number, rows: number) {
+    await this.enqueue(async () => {
+      this.pty.resize(Math.max(20, Math.floor(cols)), Math.max(8, Math.floor(rows)));
     });
   }
 
