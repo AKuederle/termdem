@@ -101,10 +101,16 @@ importers:
       node-pty:
         specifier: ^1.1.0
         version: 1.1.0
+      react:
+        specifier: 'catalog:'
+        version: 19.2.5
     devDependencies:
       '@types/node':
         specifier: ^25.5.0
         version: 25.6.0
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.14
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260328.1
         version: 7.0.0-dev.20260328.1
