@@ -37,11 +37,24 @@ function stripTrailingPrompt(lines: string[], promptPattern?: RegExp) {
   }
 
   const lastLine = lines[lines.length - 1];
-  if (!lastLine || !promptPattern.test(lastLine)) {
+  if (!lastLine) {
     return lines;
   }
 
-  return lines.slice(0, -1);
+  if (matchesWholeValue(lastLine, promptPattern)) {
+    return lines.slice(0, -1);
+  }
+
+  for (let start = 1; start < lastLine.length; start += 1) {
+    const suffix = lastLine.slice(start);
+    if (!matchesWholeValue(suffix, promptPattern)) {
+      continue;
+    }
+
+    return [...lines.slice(0, -1), lastLine.slice(0, start)];
+  }
+
+  return lines;
 }
 
 function trimTrailingEmptyLines(lines: string[]) {
@@ -51,4 +64,11 @@ function trimTrailingEmptyLines(lines: string[]) {
   }
 
   return lines.slice(0, end);
+}
+
+function matchesWholeValue(value: string, pattern: RegExp) {
+  const flags = pattern.flags.replace(/[gy]/gu, "");
+  const matcher = new RegExp(pattern.source, flags);
+  const match = matcher.exec(value);
+  return match?.index === 0 && match[0] === value;
 }

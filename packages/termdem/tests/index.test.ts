@@ -41,6 +41,30 @@ test("normalizeExecCapture keeps raw text available while pruning empty trailing
   expect(result.lines).toEqual(["README.md", "src"]);
 });
 
+test("normalizeExecCapture strips a prompt suffix from the final output line", () => {
+  const result = normalizeExecCapture("alpha fileTERMDEM> ", {
+    promptPattern: /^TERMDEM> $/u,
+  });
+
+  expect(result.text).toBe("alpha file");
+  expect(result.lines).toEqual(["alpha file"]);
+});
+
+test("normalizeExecCapture is stable when promptPattern uses stateful regex flags", () => {
+  const promptPattern = /^TERMDEM> $/gu;
+
+  expect(
+    normalizeExecCapture("TERMDEM> ", {
+      promptPattern,
+    }).lines,
+  ).toEqual([]);
+  expect(
+    normalizeExecCapture("TERMDEM> ", {
+      promptPattern,
+    }).lines,
+  ).toEqual([]);
+});
+
 test("pane sessions can type a command and press Enter against a real shell", async () => {
   const cwd = await createTempDir();
   const visibleOutput: string[] = [];
