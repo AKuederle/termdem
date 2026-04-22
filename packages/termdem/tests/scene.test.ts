@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from "react";
+import { createElement, Fragment } from "react";
 import { expect, test } from "vite-plus/test";
 import { Pane, Stage, collectPaneDefinitions } from "../src/scene.ts";
 
@@ -7,13 +7,13 @@ test("collectPaneDefinitions resolves panes by name in declaration order", () =>
     Stage,
     null,
     createElement(
-      Stack,
+      Fragment,
       null,
       createElement(Pane, {
         name: "main",
         className: "terminal-surface",
       }),
-      createElement(Stack, null, createElement(Pane, { name: "side" })),
+      createElement(Fragment, null, createElement(Pane, { name: "side" })),
     ),
   );
 
@@ -42,6 +42,14 @@ test("collectPaneDefinitions fails clearly on duplicate pane names", () => {
   expect(() => collectPaneDefinitions(scene)).toThrowError('Duplicate pane name "main"');
 });
 
-function Stack({ children }: { children?: ReactNode }) {
-  return children ?? null;
+test("collectPaneDefinitions rejects custom components inside stage scenes", () => {
+  const scene = createElement(Stage, null, createElement(Sidebar));
+
+  expect(() => collectPaneDefinitions(scene)).toThrowError(
+    "Custom React components are not supported inside Stage scenes",
+  );
+});
+
+function Sidebar() {
+  return createElement(Pane, { name: "side" });
 }

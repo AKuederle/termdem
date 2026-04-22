@@ -38,7 +38,11 @@ const defaultPrompt = "TERMDEM> ";
 export async function createPaneSession(options: PaneSessionOptions = {}): Promise<PaneSession> {
   const prompt = options.prompt ?? defaultPrompt;
   const shell = options.shell ?? "/bin/bash";
-  const shellArgs = shell.endsWith("bash") ? ["--noprofile", "--norc", "-i"] : ["-i"];
+  if (!shell.endsWith("bash")) {
+    throw new Error("Only bash shells are currently supported");
+  }
+
+  const shellArgs = ["--noprofile", "--norc", "-i"];
   const pty = spawn(shell, shellArgs, {
     name: "xterm-256color",
     cols: options.cols ?? 120,

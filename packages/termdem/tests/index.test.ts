@@ -89,6 +89,14 @@ test("pane sessions can type a command and press Enter against a real shell", as
   }
 });
 
+test("pane sessions fail fast for unsupported non-bash shells", async () => {
+  await expect(
+    createPaneSession({
+      shell: "/bin/zsh",
+    }),
+  ).rejects.toThrow("Only bash shells are currently supported");
+});
+
 test("pane sessions can chain exec results from ls into cat", async () => {
   const cwd = await createTempDir();
   await writeFile(join(cwd, "alpha.txt"), "alpha file\n", "utf8");

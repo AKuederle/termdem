@@ -1,4 +1,11 @@
-import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import {
+  Children,
+  cloneElement,
+  Fragment,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 
 export type PaneStyle = Record<string, number | string>;
 
@@ -10,7 +17,6 @@ export type PaneProps = {
   name: string;
   className?: string;
   style?: PaneStyle;
-  children?: ReactNode;
 };
 
 export type PaneDefinition = {
@@ -71,7 +77,9 @@ function walkScene(node: ReactNode, visitPane: (pane: PaneElement) => void) {
     }
 
     const element = child as SceneElement;
+    assertSupportedSceneElement(element);
     if (element.type === Pane) {
+      assertPaneIsLeaf(element);
       visitPane(element as PaneElement);
       return;
     }
@@ -87,7 +95,9 @@ function transformScene(node: ReactNode, replacePane: (pane: PaneElement) => Rea
     }
 
     const element = child as SceneElement;
+    assertSupportedSceneElement(element);
     if (element.type === Pane) {
+      assertPaneIsLeaf(element);
       return replacePane(element as PaneElement);
     }
 
@@ -102,4 +112,25 @@ function paneDefinitionFromElement(element: PaneElement): PaneDefinition {
     className: element.props.className,
     style: element.props.style,
   };
+}
+
+function assertPaneIsLeaf(element: SceneElement) {
+  if (Children.count(element.props.children) === 0) {
+    return;
+  }
+
+  throw new Error("Pane nodes cannot have children");
+}
+
+function assertSupportedSceneElement(element: SceneElement) {
+  if (
+    element.type === Pane ||
+    element.type === Stage ||
+    element.type === Fragment ||
+    typeof element.type === "string"
+  ) {
+    return;
+  }
+
+  throw new Error("Custom React components are not supported inside Stage scenes");
 }
