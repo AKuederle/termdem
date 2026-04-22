@@ -1,4 +1,4 @@
-import { createContext, createElement, Fragment, StrictMode } from "react";
+import { createContext, createElement, Fragment, StrictMode, Suspense } from "react";
 import { expect, test } from "vite-plus/test";
 import { Pane, Stage, collectPaneDefinitions } from "../src/scene.ts";
 
@@ -75,6 +75,24 @@ test("collectPaneDefinitions allows standard React wrapper elements", () => {
       style: undefined,
     },
   ]);
+});
+
+test("collectPaneDefinitions rejects unsupported React wrappers with pane-bearing fallback props", () => {
+  const scene = createElement(
+    Stage,
+    null,
+    createElement(
+      Suspense,
+      {
+        fallback: createElement(Pane, { name: "fallback" }),
+      },
+      null,
+    ),
+  );
+
+  expect(() => collectPaneDefinitions(scene)).toThrowError(
+    "Custom React components are not supported inside Stage scenes",
+  );
 });
 
 function Sidebar() {

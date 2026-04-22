@@ -1,4 +1,12 @@
-import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import {
+  Children,
+  cloneElement,
+  Fragment,
+  isValidElement,
+  StrictMode,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 
 export type PaneStyle = Record<string, number | string>;
 
@@ -120,7 +128,7 @@ function assertSupportedSceneElement(element: SceneElement) {
     element.type === Pane ||
     element.type === Stage ||
     typeof element.type === "string" ||
-    typeof element.type === "symbol" ||
+    isSupportedSymbolWrapper(element.type) ||
     isContextWrapperType(element.type)
   ) {
     return;
@@ -136,4 +144,8 @@ function isContextWrapperType(value: unknown) {
 
   const kind = value.$$typeof;
   return kind === Symbol.for("react.context") || kind === Symbol.for("react.provider");
+}
+
+function isSupportedSymbolWrapper(value: unknown) {
+  return value === Fragment || value === StrictMode;
 }
