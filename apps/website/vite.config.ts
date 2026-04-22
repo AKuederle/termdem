@@ -288,7 +288,33 @@ function closeWebSocket(ws: WebSocket) {
 }
 
 function isLoopbackAddress(address: string | undefined) {
-  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+  if (!address) {
+    return false;
+  }
+
+  if (address === "::1") {
+    return true;
+  }
+
+  if (address.startsWith("::ffff:")) {
+    return isIPv4Loopback(address.slice("::ffff:".length));
+  }
+
+  return isIPv4Loopback(address);
+}
+
+function isIPv4Loopback(address: string) {
+  const octets = address.split(".");
+  if (octets.length !== 4) {
+    return false;
+  }
+
+  const numbers = octets.map((octet) => Number.parseInt(octet, 10));
+  if (numbers.some((value) => Number.isNaN(value) || value < 0 || value > 255)) {
+    return false;
+  }
+
+  return numbers[0] === 127;
 }
 
 export default defineConfig({
