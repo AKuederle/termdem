@@ -1,4 +1,4 @@
-import { createContext, createElement, Fragment, StrictMode, Suspense } from "react";
+import { createContext, createElement, Fragment, Profiler, StrictMode, Suspense } from "react";
 import { expect, test } from "vite-plus/test";
 import { Pane, Stage, collectPaneDefinitions } from "../src/scene.ts";
 
@@ -72,6 +72,29 @@ test("collectPaneDefinitions allows standard React wrapper elements", () => {
     {
       className: undefined,
       name: "wrapped",
+      style: undefined,
+    },
+  ]);
+});
+
+test("collectPaneDefinitions allows Profiler wrappers", () => {
+  const scene = createElement(
+    Stage,
+    null,
+    createElement(
+      Profiler,
+      {
+        id: "scene",
+        onRender() {},
+      },
+      createElement(Pane, { name: "profiled" }),
+    ),
+  );
+
+  expect(collectPaneDefinitions(scene)).toEqual([
+    {
+      className: undefined,
+      name: "profiled",
       style: undefined,
     },
   ]);

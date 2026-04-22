@@ -3,6 +3,7 @@ import {
   cloneElement,
   Fragment,
   isValidElement,
+  Profiler,
   StrictMode,
   type ReactElement,
   type ReactNode,
@@ -147,5 +148,5 @@ function isContextWrapperType(value: unknown) {
 }
 
 function isSupportedSymbolWrapper(value: unknown) {
-  return value === Fragment || value === StrictMode;
+  return value === Fragment || value === Profiler || value === StrictMode;
 }
