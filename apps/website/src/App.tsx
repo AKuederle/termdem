@@ -133,7 +133,7 @@ function PaneTerminalCard({ pane }: { pane: PaneDefinition }) {
 
     runningScriptKeyRef.current = connectionKey;
     void runPaneScript();
-  }, [connectionKey, meta, runPaneScript, spec.script, status]);
+  }, [connectionKey, meta, spec.script, status]);
 
   return (
     <article className={pane.className} style={pane.style}>
@@ -312,7 +312,7 @@ function usePaneConnection(paneName: string) {
       rejectPendingExecs(new Error(`Pane ${paneName} disconnected`));
       socket.close();
     };
-  }, [connectionKey, handleServerMessage, paneName, rejectPendingExecs]);
+  }, [connectionKey, paneName]);
 
   const reconnect = useEffectEvent(() => {
     setConnectionKey((value) => value + 1);
