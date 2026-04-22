@@ -257,6 +257,10 @@ function isAuthorizedUpgrade(
     return false;
   }
 
+  if (!isLoopbackHost(host)) {
+    return false;
+  }
+
   const expectedOrigin = `${httpsEnabled ? "https" : "http"}://${host}`;
   return origin === expectedOrigin;
 }
@@ -272,6 +276,20 @@ function firstHeaderValue(value: string | string[] | undefined) {
 function closeWebSocket(ws: WebSocket) {
   if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
     ws.close();
+  }
+}
+
+function isLoopbackHost(host: string) {
+  try {
+    const { hostname } = new URL(`http://${host}`);
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "[::1]" ||
+      hostname === "::1"
+    );
+  } catch {
+    return false;
   }
 }
 
