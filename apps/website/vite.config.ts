@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -13,6 +14,7 @@ import { WebSocket, WebSocketServer, type RawData } from "ws";
 
 const appDir = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(appDir, "../..");
+const bridgeToken = randomBytes(24).toString("hex");
 
 type PaneWorkspace = {
   cwd: string;
@@ -32,6 +34,11 @@ function ptyBridge(): Plugin {
           return;
         }
 
+        if (!isAuthorizedUpgrade(request, url, Boolean(server.config.server.https))) {
+          socket.destroy();
+          return;
+        }
+
         const paneName = decodeURIComponent(url.pathname.slice("/panes/".length)) || "main";
 
         wss.handleUpgrade(request, socket, head, (ws) => {
@@ -43,28 +50,24 @@ function ptyBridge(): Plugin {
         wss.close();
       });
     },
+    transformIndexHtml() {
+      return [
+        {
+          tag: "meta",
+          attrs: {
+            name: "termdem-bridge-token",
+            content: bridgeToken,
+          },
+          injectTo: "head",
+        },
+      ];
+    },
   };
 }
 
 async function wireSession(ws: WebSocket, paneName: string) {
-  const workspace = await createPaneWorkspace(paneName);
-  const shell = process.env.TERMDEM_SHELL ?? "/bin/bash";
-  const prompt = `(${paneName}) $ `;
-  const session = await createPaneSession({
-    cwd: workspace.cwd,
-    shell,
-    cols: 120,
-    rows: 30,
-    prompt,
-    onOutput(data) {
-      sendPaneMessage(ws, {
-        type: "pane.output",
-        pane: paneName,
-        data,
-      });
-    },
-  });
-
+  let workspace: PaneWorkspace | null = null;
+  let session: Awaited<ReturnType<typeof createPaneSession>> | null = null;
   let closed = false;
   let messageQueue = Promise.resolve();
 
@@ -74,8 +77,8 @@ async function wireSession(ws: WebSocket, paneName: string) {
     }
 
     closed = true;
-    await session.close();
-    await workspace.dispose();
+    await session?.close();
+    await workspace?.dispose();
   };
 
   const fail = async (error: unknown) => {
@@ -85,62 +88,8 @@ async function wireSession(ws: WebSocket, paneName: string) {
       message: formatError(error),
     });
     await shutdown();
-    ws.close();
+    closeWebSocket(ws);
   };
-
-  sendPaneMessage(ws, {
-    type: "pane.meta",
-    pane: paneName,
-    shell,
-    cwd: workspace.cwd,
-    prompt,
-  });
-
-  ws.on("message", (message) => {
-    messageQueue = messageQueue
-      .then(async () => {
-        const parsed = parsePaneClientMessage(rawDataToString(message));
-        if (!parsed || parsed.pane !== paneName) {
-          return;
-        }
-
-        switch (parsed.type) {
-          case "pane.input":
-            if (parsed.data === "\r") {
-              await session.press("Enter");
-              return;
-            }
-
-            await session.type(parsed.data);
-            return;
-          case "pane.resize":
-            await session.resize(parsed.cols, parsed.rows);
-            return;
-          case "pane.type":
-            await session.type(parsed.text, { delayMs: parsed.delayMs });
-            return;
-          case "pane.press":
-            await session.press(parsed.key);
-            return;
-          case "pane.exec": {
-            const result = await session.exec(parsed.command, {
-              typeDelayMs: parsed.typeDelayMs,
-            });
-            sendPaneMessage(ws, {
-              type: "pane.exec.completed",
-              pane: paneName,
-              result,
-            });
-            return;
-          }
-          default:
-            return;
-        }
-      })
-      .catch(async (error) => {
-        await fail(error);
-      });
-  });
 
   ws.on("close", () => {
     void shutdown();
@@ -149,6 +98,96 @@ async function wireSession(ws: WebSocket, paneName: string) {
   ws.on("error", () => {
     void shutdown();
   });
+
+  try {
+    workspace = await createPaneWorkspace(paneName);
+    if (closed) {
+      await shutdown();
+      return;
+    }
+
+    const shell = process.env.TERMDEM_SHELL ?? "/bin/bash";
+    const prompt = `(${paneName}) $ `;
+    session = await createPaneSession({
+      cwd: workspace.cwd,
+      shell,
+      cols: 120,
+      rows: 30,
+      prompt,
+      onOutput(data) {
+        sendPaneMessage(ws, {
+          type: "pane.output",
+          pane: paneName,
+          data,
+        });
+      },
+    });
+
+    if (closed) {
+      await shutdown();
+      return;
+    }
+
+    sendPaneMessage(ws, {
+      type: "pane.meta",
+      pane: paneName,
+      shell,
+      cwd: workspace.cwd,
+      prompt,
+    });
+
+    ws.on("message", (message) => {
+      messageQueue = messageQueue
+        .then(async () => {
+          if (!session) {
+            return;
+          }
+
+          const parsed = parsePaneClientMessage(rawDataToString(message));
+          if (!parsed || parsed.pane !== paneName) {
+            return;
+          }
+
+          switch (parsed.type) {
+            case "pane.input":
+              if (parsed.data === "\r") {
+                await session.press("Enter");
+                return;
+              }
+
+              await session.type(parsed.data);
+              return;
+            case "pane.resize":
+              await session.resize(parsed.cols, parsed.rows);
+              return;
+            case "pane.type":
+              await session.type(parsed.text, { delayMs: parsed.delayMs });
+              return;
+            case "pane.press":
+              await session.press(parsed.key);
+              return;
+            case "pane.exec": {
+              const result = await session.exec(parsed.command, {
+                typeDelayMs: parsed.typeDelayMs,
+              });
+              sendPaneMessage(ws, {
+                type: "pane.exec.completed",
+                pane: paneName,
+                result,
+              });
+              return;
+            }
+            default:
+              return;
+          }
+        })
+        .catch(async (error) => {
+          await fail(error);
+        });
+    });
+  } catch (error) {
+    await fail(error);
+  }
 }
 
 async function createPaneWorkspace(paneName: string): Promise<PaneWorkspace> {
@@ -201,6 +240,39 @@ function rawDataToString(data: RawData): string {
   }
 
   return data.toString("utf8");
+}
+
+function isAuthorizedUpgrade(
+  request: { headers: Record<string, string | string[] | undefined> },
+  url: URL,
+  httpsEnabled: boolean,
+) {
+  if (url.searchParams.get("token") !== bridgeToken) {
+    return false;
+  }
+
+  const origin = firstHeaderValue(request.headers.origin);
+  const host = firstHeaderValue(request.headers.host);
+  if (!origin || !host) {
+    return false;
+  }
+
+  const expectedOrigin = `${httpsEnabled ? "https" : "http"}://${host}`;
+  return origin === expectedOrigin;
+}
+
+function firstHeaderValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value;
+}
+
+function closeWebSocket(ws: WebSocket) {
+  if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+    ws.close();
+  }
 }
 
 export default defineConfig({

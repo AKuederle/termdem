@@ -79,13 +79,24 @@ const demoScene = (
 
 function socketUrlForPane(paneName: string) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}/panes/${paneName}`;
+  const bridgeToken = getBridgeToken();
+  return `${protocol}//${window.location.host}/panes/${paneName}?token=${encodeURIComponent(bridgeToken)}`;
 }
 
 function PaneTerminalCard({ pane }: { pane: PaneDefinition }) {
   const spec = getPaneSpec(pane.name);
-  const { connectionKey, exec, focus, meta, reconnect, ref, requestResize, status, write } =
-    usePaneConnection(pane.name);
+  const {
+    connectionKey,
+    exec,
+    focus,
+    meta,
+    reconnect,
+    ref,
+    requestResize,
+    sendInput,
+    status,
+    write,
+  } = usePaneConnection(pane.name);
   const [scriptState, setScriptState] = useState<ScriptState>("idle");
   const runningScriptKeyRef = useRef<number | null>(null);
 
@@ -153,6 +164,7 @@ function PaneTerminalCard({ pane }: { pane: PaneDefinition }) {
             focus();
           }
         }}
+        onData={sendInput}
         onResize={requestResize}
       />
 
@@ -213,6 +225,16 @@ function usePaneConnection(paneName: string) {
         pane: paneName,
         cols,
         rows,
+      });
+    } catch {}
+  });
+
+  const sendInput = useEffectEvent((data: string) => {
+    try {
+      sendMessage({
+        type: "pane.input",
+        pane: paneName,
+        data,
       });
     } catch {}
   });
@@ -304,6 +326,7 @@ function usePaneConnection(paneName: string) {
     reconnect,
     ref,
     requestResize,
+    sendInput,
     status,
     write,
   };
@@ -324,6 +347,17 @@ function getPaneSpec(name: string) {
   }
 
   return spec;
+}
+
+function getBridgeToken() {
+  const token = document
+    .querySelector('meta[name="termdem-bridge-token"]')
+    ?.getAttribute("content");
+  if (!token) {
+    throw new Error("Missing termdem bridge token");
+  }
+
+  return token;
 }
 
 export default function App() {
