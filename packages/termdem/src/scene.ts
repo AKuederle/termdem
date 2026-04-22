@@ -1,11 +1,4 @@
-import {
-  Children,
-  cloneElement,
-  Fragment,
-  isValidElement,
-  type ReactElement,
-  type ReactNode,
-} from "react";
+import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
 
 export type PaneStyle = Record<string, number | string>;
 
@@ -126,11 +119,21 @@ function assertSupportedSceneElement(element: SceneElement) {
   if (
     element.type === Pane ||
     element.type === Stage ||
-    element.type === Fragment ||
-    typeof element.type === "string"
+    typeof element.type === "string" ||
+    typeof element.type === "symbol" ||
+    isContextWrapperType(element.type)
   ) {
     return;
   }
 
   throw new Error("Custom React components are not supported inside Stage scenes");
+}
+
+function isContextWrapperType(value: unknown) {
+  if (typeof value !== "object" || value === null || !("$$typeof" in value)) {
+    return false;
+  }
+
+  const kind = value.$$typeof;
+  return kind === Symbol.for("react.context") || kind === Symbol.for("react.provider");
 }

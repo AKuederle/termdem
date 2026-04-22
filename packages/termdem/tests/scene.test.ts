@@ -1,4 +1,4 @@
-import { createElement, Fragment } from "react";
+import { createContext, createElement, Fragment, StrictMode } from "react";
 import { expect, test } from "vite-plus/test";
 import { Pane, Stage, collectPaneDefinitions } from "../src/scene.ts";
 
@@ -48,6 +48,33 @@ test("collectPaneDefinitions rejects custom components inside stage scenes", () 
   expect(() => collectPaneDefinitions(scene)).toThrowError(
     "Custom React components are not supported inside Stage scenes",
   );
+});
+
+test("collectPaneDefinitions allows standard React wrapper elements", () => {
+  const SceneContext = createContext<null>(null);
+  const scene = createElement(
+    Stage,
+    null,
+    createElement(
+      StrictMode,
+      null,
+      createElement(
+        SceneContext.Provider,
+        {
+          value: null,
+        },
+        createElement(Pane, { name: "wrapped" }),
+      ),
+    ),
+  );
+
+  expect(collectPaneDefinitions(scene)).toEqual([
+    {
+      className: undefined,
+      name: "wrapped",
+      style: undefined,
+    },
+  ]);
 });
 
 function Sidebar() {
