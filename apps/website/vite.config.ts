@@ -34,7 +34,14 @@ function ptyBridge(): Plugin {
           return;
         }
 
-        if (!isAuthorizedUpgrade(request, url, Boolean(server.config.server.https))) {
+        if (
+          !isAuthorizedUpgrade(
+            request,
+            url,
+            Boolean(server.config.server.https),
+            socket.remoteAddress,
+          )
+        ) {
           socket.destroy();
           return;
         }
@@ -246,18 +253,19 @@ function isAuthorizedUpgrade(
   request: { headers: Record<string, string | string[] | undefined> },
   url: URL,
   httpsEnabled: boolean,
+  remoteAddress: string | undefined,
 ) {
   if (url.searchParams.get("token") !== bridgeToken) {
+    return false;
+  }
+
+  if (!isLoopbackAddress(remoteAddress)) {
     return false;
   }
 
   const origin = firstHeaderValue(request.headers.origin);
   const host = firstHeaderValue(request.headers.host);
   if (!origin || !host) {
-    return false;
-  }
-
-  if (!isLoopbackHost(host)) {
     return false;
   }
 
@@ -279,18 +287,8 @@ function closeWebSocket(ws: WebSocket) {
   }
 }
 
-function isLoopbackHost(host: string) {
-  try {
-    const { hostname } = new URL(`http://${host}`);
-    return (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "[::1]" ||
-      hostname === "::1"
-    );
-  } catch {
-    return false;
-  }
+function isLoopbackAddress(address: string | undefined) {
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
 }
 
 export default defineConfig({
