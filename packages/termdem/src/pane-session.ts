@@ -50,6 +50,12 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
     cwd: options.cwd ?? process.cwd(),
     env: {
       ...process.env,
+      DELTA_PAGER: "cat",
+      GH_PAGER: "cat",
+      GIT_PAGER: "cat",
+      LESS: "FRX",
+      MANPAGER: "cat",
+      PAGER: "cat",
       TERM: "xterm-256color",
       PS1: prompt,
       PROMPT_COMMAND: "",

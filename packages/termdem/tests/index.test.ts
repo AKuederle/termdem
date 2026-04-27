@@ -1,4 +1,4 @@
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
@@ -135,6 +135,40 @@ test("pane sessions can chain exec results from ls into cat", async () => {
     expect(transcript).toContain(`cat '${firstFile}'`);
     expect(transcript).toContain("alpha file");
   } finally {
+    await session.close();
+  }
+});
+
+test("pane sessions disable pagers so exec commands can complete in a tty", async () => {
+  const cwd = await createTempDir();
+  const pagerPath = join(cwd, "blocking-pager.sh");
+  await writeFile(pagerPath, "#!/bin/sh\nprintf 'pager blocked\\n'\nsleep 30\n", "utf8");
+  await chmod(pagerPath, 0o755);
+
+  const previousGitPager = process.env.GIT_PAGER;
+  process.env.GIT_PAGER = pagerPath;
+
+  const session = await createPaneSession({ cwd });
+
+  try {
+    await session.exec("git init");
+    await session.exec(
+      "git config user.name 'termdem' && git config user.email 'demo@example.test'",
+    );
+    await writeFile(join(cwd, "README.md"), "hello\n", "utf8");
+    await session.exec("git add README.md && git commit -m init");
+
+    const log = await withTimeout(session.exec("git log --oneline -1"), 1_000);
+
+    expect(log.lines[0]).toContain("init");
+    expect(log.raw).not.toContain("pager blocked");
+  } finally {
+    if (previousGitPager === undefined) {
+      delete process.env.GIT_PAGER;
+    } else {
+      process.env.GIT_PAGER = previousGitPager;
+    }
+
     await session.close();
   }
 });
@@ -353,4 +387,20 @@ async function waitFor(assertion: () => boolean, timeoutMs = 2000) {
   }
 
   throw new Error(`Timed out after ${timeoutMs}ms`);
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Timed out after ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
 }
