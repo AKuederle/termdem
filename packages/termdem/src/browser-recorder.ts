@@ -19,6 +19,7 @@ export type BrowserRecordingOptions = {
 
 const defaultDoneTimeoutMs = 5 * 60 * 1000;
 const recordingLeadInMs = 500;
+const recordingStatusIntervalMs = 5_000;
 
 export async function recordBrowserPage(options: BrowserRecordingOptions): Promise<void> {
   const format = options.format ?? inferRecordingFormat(options.outputPath);
@@ -159,21 +160,51 @@ async function waitForRecordingDone(page: Page, options: BrowserRecordingOptions
     return;
   }
 
-  await page.waitForFunction(
-    () => globalThis.__termdem?.recording?.done === true || globalThis.__termdem?.recording?.error,
-    null,
-    {
-      timeout: options.doneTimeoutMs ?? defaultDoneTimeoutMs,
-    },
-  );
-  await throwIfRecordingErrored(page);
+  const timeoutMs = options.doneTimeoutMs ?? defaultDoneTimeoutMs;
+  const startedAt = Date.now();
+  let lastProgressAt = 0;
+  let lastStatus = "";
+
+  while (true) {
+    const status = await recordingStatus(page);
+    if (status.done) {
+      return;
+    }
+
+    if (status.error) {
+      throw new Error(`Demo script failed while recording: ${status.error}`);
+    }
+
+    const now = Date.now();
+    const action = status.action ? `: ${status.action}` : "";
+    const nextStatus = `Running demo script${action}`;
+    if (nextStatus !== lastStatus || now - lastProgressAt >= recordingStatusIntervalMs) {
+      options.onProgress?.(nextStatus);
+      lastProgressAt = now;
+      lastStatus = nextStatus;
+    }
+
+    if (now - startedAt >= timeoutMs) {
+      throw new Error(`Timed out waiting for demo script to finish${action}`);
+    }
+
+    await page.waitForTimeout(500);
+  }
 }
 
 async function throwIfRecordingErrored(page: Page) {
-  const error = await page.evaluate(() => globalThis.__termdem?.recording?.error);
+  const { error } = await recordingStatus(page);
   if (error) {
     throw new Error(`Demo script failed while recording: ${error}`);
   }
+}
+
+async function recordingStatus(page: Page) {
+  return page.evaluate(() => ({
+    action: globalThis.__termdem?.recording?.action,
+    done: globalThis.__termdem?.recording?.done === true,
+    error: globalThis.__termdem?.recording?.error,
+  }));
 }
 
 async function transcodeWebm(
@@ -221,6 +252,7 @@ declare global {
           start?: () => void;
         };
         recording?: {
+          action?: string;
           done?: boolean;
           error?: string;
           ready?: boolean;

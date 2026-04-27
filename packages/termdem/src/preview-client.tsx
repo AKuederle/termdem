@@ -491,23 +491,48 @@ function createPlaybookApi(
       return {
         async exec(command, options) {
           await waitForPlaybookActive();
-          const result = await runtime.exec(command, options);
-          await waitForPlaybookActive();
-          return result;
+          return runPaneAction(
+            `pane(${JSON.stringify(name)}).exec(${JSON.stringify(command)})`,
+            async () => {
+              const result = await runtime.exec(command, options);
+              await waitForPlaybookActive();
+              return result;
+            },
+          );
         },
         async press(key) {
           await waitForPlaybookActive();
-          await runtime.press(key);
-          await waitForPlaybookActive();
+          await runPaneAction(
+            `pane(${JSON.stringify(name)}).press(${JSON.stringify(key)})`,
+            async () => {
+              await runtime.press(key);
+              await waitForPlaybookActive();
+            },
+          );
         },
         async type(text, options) {
           await waitForPlaybookActive();
-          await runtime.type(text, options);
-          await waitForPlaybookActive();
+          await runPaneAction(
+            `pane(${JSON.stringify(name)}).type(${summarizeText(text)})`,
+            async () => {
+              await runtime.type(text, options);
+              await waitForPlaybookActive();
+            },
+          );
         },
       };
     },
   };
+}
+
+async function runPaneAction<T>(label: string, action: () => Promise<T>) {
+  markRecordingAction(label);
+
+  try {
+    return await action();
+  } finally {
+    markRecordingAction(undefined);
+  }
 }
 
 function createDemoScene(demo: PreviewDemoModule) {
@@ -602,8 +627,19 @@ function markRecordingStarted() {
     ...globalThis.__termdem,
     recording: {
       ...globalThis.__termdem?.recording,
+      action: undefined,
       done: false,
       error: undefined,
+    },
+  };
+}
+
+function markRecordingAction(action: string | undefined) {
+  globalThis.__termdem = {
+    ...globalThis.__termdem,
+    recording: {
+      ...globalThis.__termdem?.recording,
+      action,
     },
   };
 }
@@ -637,6 +673,11 @@ function formatError(error: unknown) {
   return String(error);
 }
 
+function summarizeText(text: string) {
+  const normalized = JSON.stringify(text.length > 48 ? `${text.slice(0, 45)}...` : text);
+  return normalized.replaceAll("\\n", "\\\\n");
+}
+
 declare global {
   var __termdem:
     | {
@@ -644,6 +685,7 @@ declare global {
           start?: () => void;
         };
         recording?: {
+          action?: string;
           done?: boolean;
           error?: string;
           ready?: boolean;
