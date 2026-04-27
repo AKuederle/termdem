@@ -219,6 +219,23 @@ test("resolveRecordingConfig supports separate viewport size overrides", () => {
   });
 });
 
+test("resolveRecordingConfig lets CLI size override demo viewport size by default", () => {
+  expect(
+    resolveRecordingConfig(
+      {
+        size: { width: 1920, height: 1080 },
+        viewportSize: { width: 1440, height: 900 },
+      },
+      {
+        size: "1280x720",
+      },
+    ),
+  ).toEqual({
+    size: { width: 1280, height: 720 },
+    viewportSize: { width: 1280, height: 720 },
+  });
+});
+
 test("resolveRecordingConfig falls back from demo viewport size to recording size", () => {
   expect(resolveRecordingConfig({ size: { width: 1024, height: 768 } })).toEqual({
     size: { width: 1024, height: 768 },

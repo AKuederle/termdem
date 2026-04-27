@@ -45,12 +45,15 @@ export function resolveRecordingConfig(
   demoConfig: RecordingConfig = {},
   cliOptions: RecordingCliOptions = {},
 ): ResolvedRecordingConfig {
+  const hasCliSize = Boolean(cliOptions.size);
   const size = cliOptions.size ? parseDemoSize(cliOptions.size) : (demoConfig.size ?? defaultSize);
 
   return {
     size,
     viewportSize: cliOptions.viewportSize
       ? parseDemoSize(cliOptions.viewportSize)
-      : (demoConfig.viewportSize ?? size),
+      : hasCliSize
+        ? size
+        : (demoConfig.viewportSize ?? size),
   };
 }
