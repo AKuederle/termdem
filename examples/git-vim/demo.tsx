@@ -41,6 +41,9 @@ export const { script, terminals } = createTerminalDemo(
     await git.exec("git commit -m 'Create README through vim'", { typeDelayMs: 20 });
     await git.exec("git log --oneline --decorate --stat -1", { typeDelayMs: 16 });
   },
+  {
+    size: { width: 1280, height: 720 },
+  },
 );
 
 export function render() {

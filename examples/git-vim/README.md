@@ -15,6 +15,9 @@ demo opens Vim and drives it with raw terminal input:
 The terminal workspace uses `new TmpDir({ setup })`, so every preview/restart gets a fresh repository.
 `TmpDir` owns recursive cleanup when the terminal is disposed.
 
+The demo config sets `size: 1280x720`. A future record command can override it with
+`--size <width>x<height>`.
+
 Preview command once the CLI exists:
 
 ```bash

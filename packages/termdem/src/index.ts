@@ -8,6 +8,14 @@ export {
 export { normalizeExecCapture } from "./normalize.ts";
 export { createPaneSession, type PaneSession, type PaneSessionOptions } from "./pane-session.ts";
 export {
+  parseDemoSize,
+  resolveRecordingConfig,
+  type DemoSize,
+  type RecordingCliOptions,
+  type RecordingConfig,
+  type ResolvedRecordingConfig,
+} from "./recording-config.ts";
+export {
   createTerminalWorkspace,
   Dir,
   TmpDir,

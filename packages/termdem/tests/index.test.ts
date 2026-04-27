@@ -10,6 +10,7 @@ import {
   ExecNodeError,
   normalizeExecCapture,
   quoteShellArg,
+  resolveRecordingConfig,
   TmpDir,
 } from "../src/index.ts";
 
@@ -189,6 +190,49 @@ test("execNode rejects by default and can return non-zero results", async () => 
     stderr: "failed",
     stdout: "before",
   });
+});
+
+test("resolveRecordingConfig uses CLI size for recording and viewport by default", () => {
+  expect(
+    resolveRecordingConfig({ size: { width: 1280, height: 720 } }, { size: "1920x1080" }),
+  ).toEqual({
+    size: { width: 1920, height: 1080 },
+    viewportSize: { width: 1920, height: 1080 },
+  });
+});
+
+test("resolveRecordingConfig supports separate viewport size overrides", () => {
+  expect(
+    resolveRecordingConfig(
+      {
+        size: { width: 1920, height: 1080 },
+        viewportSize: { width: 1280, height: 720 },
+      },
+      {
+        size: "1440x1080",
+        viewportSize: "1920x1080",
+      },
+    ),
+  ).toEqual({
+    size: { width: 1440, height: 1080 },
+    viewportSize: { width: 1920, height: 1080 },
+  });
+});
+
+test("resolveRecordingConfig falls back from demo viewport size to recording size", () => {
+  expect(resolveRecordingConfig({ size: { width: 1024, height: 768 } })).toEqual({
+    size: { width: 1024, height: 768 },
+    viewportSize: { width: 1024, height: 768 },
+  });
+});
+
+test("resolveRecordingConfig rejects invalid size flags", () => {
+  expect(() => resolveRecordingConfig({}, { size: "1920-1080" })).toThrow(
+    'Invalid size "1920-1080"',
+  );
+  expect(() => resolveRecordingConfig({}, { viewportSize: "0x1080" })).toThrow(
+    'Invalid size "0x1080"',
+  );
 });
 
 test("TmpDir instances can be shared by multiple terminal workspaces", async () => {

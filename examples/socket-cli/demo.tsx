@@ -59,6 +59,10 @@ export const { script, terminals } = createTerminalDemo(
     );
     await server.exec("node scripts/server.mjs status", { typeDelayMs: 18 });
   },
+  {
+    size: { width: 1920, height: 1080 },
+    viewportSize: { width: 1440, height: 900 },
+  },
 );
 
 export function render() {

@@ -35,6 +35,16 @@ declare module "@akuederle/termdem" {
     stdout: string;
   };
 
+  export type DemoSize = {
+    height: number;
+    width: number;
+  };
+
+  export type DemoConfig = {
+    size?: DemoSize;
+    viewportSize?: DemoSize;
+  };
+
   export class Dir {
     constructor(
       setup: () => Promise<string> | string,
@@ -59,6 +69,7 @@ declare module "@akuederle/termdem" {
     script: (api: {
       pane: (name: TTerminals[number]["name"]) => PaneController;
     }) => Promise<void> | void,
+    config?: DemoConfig,
   ): {
     script: unknown;
     terminals: Record<TTerminals[number]["name"], TerminalHandle>;
