@@ -290,6 +290,7 @@ function PaneTerminalCard({
 
 function usePaneConnection(paneName: string) {
   const actionIdRef = useRef(0);
+  const latestResizeRef = useRef<{ cols: number; rows: number } | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const pendingActionsRef = useRef(new Map<string, PendingAction>());
   const pendingExecsRef = useRef<PendingExec[]>([]);
@@ -333,6 +334,20 @@ function usePaneConnection(paneName: string) {
     });
   });
 
+  const sendLatestResize = useEffectEvent(() => {
+    const latestResize = latestResizeRef.current;
+    if (!latestResize) {
+      return;
+    }
+
+    sendMessage({
+      type: "pane.resize",
+      pane: paneName,
+      cols: latestResize.cols,
+      rows: latestResize.rows,
+    });
+  });
+
   const exec = useEffectEvent((command: string, options?: { typeDelayMs?: number }) => {
     return new Promise<ExecResult>((resolve, reject) => {
       pendingExecsRef.current.push({ resolve, reject });
@@ -359,13 +374,10 @@ function usePaneConnection(paneName: string) {
   });
 
   const requestResize = useEffectEvent((cols: number, rows: number) => {
+    latestResizeRef.current = { cols, rows };
+
     try {
-      sendMessage({
-        type: "pane.resize",
-        pane: paneName,
-        cols,
-        rows,
-      });
+      sendLatestResize();
     } catch {}
   });
 
@@ -385,6 +397,7 @@ function usePaneConnection(paneName: string) {
 
     switch (message.type) {
       case "pane.meta":
+        sendLatestResize();
         setStatus("open");
         return;
       case "pane.output":
