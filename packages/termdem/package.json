@@ -12,12 +12,16 @@
     "type": "git",
     "url": "git+https://github.com/author/library.git"
   },
+  "bin": {
+    "termdem": "./dist/cli.mjs"
+  },
   "files": [
     "dist"
   ],
   "type": "module",
   "exports": {
     ".": "./dist/index.mjs",
+    "./cli": "./dist/cli.mjs",
     "./protocol": "./dist/protocol.mjs",
     "./scene": "./dist/scene.mjs",
     "./package.json": "./package.json"

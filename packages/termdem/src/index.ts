@@ -15,6 +15,7 @@ export {
   type RecordingConfig,
   type ResolvedRecordingConfig,
 } from "./recording-config.ts";
+export { inferRecordingFormat, type RecordingFormat } from "./recording-output.ts";
 export {
   createTerminalWorkspace,
   Dir,
