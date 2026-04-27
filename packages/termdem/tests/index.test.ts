@@ -1,8 +1,14 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
-import { createPaneSession, normalizeExecCapture } from "../src/index.ts";
+import {
+  createPaneSession,
+  createTerminalWorkspace,
+  Dir,
+  normalizeExecCapture,
+  TmpDir,
+} from "../src/index.ts";
 
 const cleanupPaths: string[] = [];
 
@@ -135,10 +141,100 @@ test("pane sessions can chain exec results from ls into cat", async () => {
   }
 });
 
+test("TmpDir instances can be shared by multiple terminal workspaces", async () => {
+  const setupDirs: string[] = [];
+  const tmpDir = new TmpDir({
+    setup: async (dir) => {
+      setupDirs.push(dir);
+      cleanupPaths.push(dir);
+      await writeFile(join(dir, "alpha.txt"), `setup ${setupDirs.length}\n`, "utf8");
+    },
+  });
+
+  const first = await createTerminalWorkspace({ name: "A", pwd: tmpDir });
+  const second = await createTerminalWorkspace({ name: "B", pwd: tmpDir });
+
+  expect(first.cwd).toBe(second.cwd);
+  expect(setupDirs).toEqual([first.cwd]);
+  expect(await pathExists(first.cwd)).toBe(true);
+
+  await first.dispose();
+  expect(await pathExists(second.cwd)).toBe(true);
+
+  await second.dispose();
+  expect(await pathExists(first.cwd)).toBe(false);
+
+  const next = await createTerminalWorkspace({ name: "C", pwd: tmpDir });
+  expect(next.cwd).not.toBe(first.cwd);
+  expect(setupDirs).toEqual([first.cwd, next.cwd]);
+
+  await next.dispose();
+});
+
+test("Dir owns setup and cleanup for reusable non-temp workspaces", async () => {
+  const cleanupDirs: string[] = [];
+  const dir = new Dir(
+    async () => {
+      const path = await createTempDir();
+      await writeFile(join(path, "marker.txt"), "managed\n", "utf8");
+      return path;
+    },
+    async (path) => {
+      cleanupDirs.push(path);
+      await rm(path, { recursive: true, force: true });
+    },
+  );
+
+  const first = await createTerminalWorkspace({ name: "A", pwd: dir });
+  const second = await createTerminalWorkspace({ name: "B", pwd: dir });
+
+  expect(first.cwd).toBe(second.cwd);
+  expect(await readFile(join(first.cwd, "marker.txt"), "utf8")).toBe("managed\n");
+
+  await first.dispose();
+  expect(cleanupDirs).toEqual([]);
+  expect(await pathExists(first.cwd)).toBe(true);
+
+  await second.dispose();
+  expect(cleanupDirs).toEqual([first.cwd]);
+  expect(await pathExists(first.cwd)).toBe(false);
+});
+
+test("terminal cleanup runs before workspace disposal and is idempotent", async () => {
+  const cleanupEvents: string[] = [];
+  const tmpDir = new TmpDir(async (dir) => {
+    cleanupPaths.push(dir);
+    await writeFile(join(dir, "marker.txt"), "ready\n", "utf8");
+  });
+
+  const workspace = await createTerminalWorkspace({
+    cleanup: async ({ cwd, name }) => {
+      cleanupEvents.push(`${name}:${await readFile(join(cwd, "marker.txt"), "utf8")}`);
+    },
+    name: "A",
+    pwd: tmpDir,
+  });
+
+  await workspace.dispose();
+  await workspace.dispose();
+
+  expect(cleanupEvents).toEqual(["A:ready\n"]);
+  expect(await pathExists(workspace.cwd)).toBe(false);
+});
+
 async function createTempDir() {
   const path = await mkdtemp(join(tmpdir(), "termdem-"));
   cleanupPaths.push(path);
   return path;
+}
+
+async function pathExists(path: string) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function waitFor(assertion: () => boolean, timeoutMs = 2000) {

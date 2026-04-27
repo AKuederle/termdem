@@ -1,10 +1,15 @@
 import { randomBytes } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { createPaneSession } from "../../packages/termdem/src/index.ts";
+import {
+  createPaneSession,
+  createTerminalWorkspace,
+  TmpDir,
+  type TerminalCleanupContext,
+  type TerminalWorkspaceDefinition,
+} from "../../packages/termdem/src/index.ts";
 import {
   parsePaneClientMessage,
   type PaneServerMessage,
@@ -17,6 +22,37 @@ const bridgeToken = randomBytes(24).toString("hex");
 type PaneWorkspace = {
   cwd: string;
   dispose(): Promise<void>;
+};
+
+const sharedDemoDir = new TmpDir({
+  setup: async (dir) => {
+    await writeFile(join(dir, "alpha.txt"), "shared alpha file\n", "utf8");
+    await writeFile(join(dir, "bravo.txt"), "shared bravo file\n", "utf8");
+  },
+});
+
+const scratchDir = new TmpDir({
+  setup: async (dir) => {
+    await writeFile(join(dir, "notes.txt"), "scratch pane notes\n", "utf8");
+  },
+});
+
+const terminalWorkspaces: Record<string, TerminalWorkspaceDefinition> = {
+  A: {
+    cleanup: markTerminalCleanup,
+    name: "A",
+    pwd: sharedDemoDir,
+  },
+  B: {
+    cleanup: markTerminalCleanup,
+    name: "B",
+    pwd: sharedDemoDir,
+  },
+  C: {
+    cleanup: markTerminalCleanup,
+    name: "C",
+    pwd: scratchDir,
+  },
 };
 
 function ptyBridge(): Plugin {
@@ -196,16 +232,23 @@ async function wireSession(ws: WebSocket, paneName: string) {
 }
 
 async function createPaneWorkspace(paneName: string): Promise<PaneWorkspace> {
-  const cwd = await mkdtemp(join(tmpdir(), "termdem-pane-"));
-  await writeFile(join(cwd, "alpha.txt"), `alpha file from pane ${paneName}\n`, "utf8");
-  await writeFile(join(cwd, "bravo.txt"), `bravo file from pane ${paneName}\n`, "utf8");
+  return createTerminalWorkspace(terminalWorkspaces[paneName] ?? createFallbackWorkspace(paneName));
+}
 
+function createFallbackWorkspace(paneName: string): TerminalWorkspaceDefinition {
   return {
-    cwd,
-    async dispose() {
-      await rm(cwd, { recursive: true, force: true });
-    },
+    name: paneName,
+    pwd: new TmpDir({
+      setup: async (dir) => {
+        await writeFile(join(dir, "alpha.txt"), `alpha file from pane ${paneName}\n`, "utf8");
+        await writeFile(join(dir, "bravo.txt"), `bravo file from pane ${paneName}\n`, "utf8");
+      },
+    }),
   };
+}
+
+async function markTerminalCleanup({ cwd, name }: TerminalCleanupContext) {
+  await writeFile(join(cwd, `.cleanup-${name}`), "cleaned\n", "utf8");
 }
 
 function sendPaneMessage(ws: WebSocket, message: PaneServerMessage) {
