@@ -1,3 +1,4 @@
+export { recordBrowserPage, type BrowserRecordingOptions } from "./browser-recorder.ts";
 export {
   ExecNodeError,
   execNode,
@@ -28,6 +29,14 @@ export {
   type TmpDirOptions,
   type TmpDirSetup,
 } from "./workspace.ts";
+export { collectPaneDefinitions, Pane, renderStageScene, Stage } from "./scene.ts";
+export {
+  createTerminalDemo,
+  type TerminalDefinition,
+  type TerminalDemo,
+  type TerminalDemoScriptApi,
+  type TerminalHandle,
+} from "./terminal-demo.ts";
 export type {
   ExecOptions,
   ExecResult,

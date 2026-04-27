@@ -36,10 +36,10 @@ export const { script, terminals } = createTerminalDemo(
       pwd: workspace,
     },
   ],
-  async ({ pane }) => {
-    const server = pane("server");
-    const listener = pane("listener");
-    const sender = pane("sender");
+  async (api) => {
+    const server = api.pane("server");
+    const listener = api.pane("listener");
+    const sender = api.pane("sender");
 
     const setup = await server.exec("node scripts/server.mjs setup", { typeDelayMs: 22 });
     const url = parseChatUrl(setup.text);

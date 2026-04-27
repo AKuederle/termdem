@@ -15,8 +15,8 @@ export const { script, terminals } = createTerminalDemo(
       pwd: repo,
     },
   ],
-  async ({ pane }) => {
-    const git = pane("git");
+  async (api) => {
+    const git = api.pane("git");
 
     await git.exec("git init", { typeDelayMs: 22 });
     await git.exec("git config user.name 'termdem' && git config user.email 'demo@example.test'", {

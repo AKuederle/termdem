@@ -4,6 +4,9 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "noEmit": true,
+    "paths": {
+      "@akuederle/termdem": ["../packages/termdem/src/index.ts"]
+    },
     "strict": true,
     "target": "ES2022"
   },

@@ -31,6 +31,24 @@ test("collectPaneDefinitions resolves panes by name in declaration order", () =>
   ]);
 });
 
+test("collectPaneDefinitions resolves panes from terminal handles", () => {
+  const scene = createElement(Stage, null, createElement(Pane, { terminal: { name: "main" } }));
+
+  expect(collectPaneDefinitions(scene)).toEqual([
+    {
+      className: undefined,
+      name: "main",
+      style: undefined,
+    },
+  ]);
+});
+
+test("collectPaneDefinitions rejects panes without name or terminal", () => {
+  const scene = createElement(Stage, null, createElement(Pane, {}));
+
+  expect(() => collectPaneDefinitions(scene)).toThrowError("Pane nodes require a name or terminal");
+});
+
 test("collectPaneDefinitions fails clearly on duplicate pane names", () => {
   const scene = createElement(
     Stage,

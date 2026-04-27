@@ -8,6 +8,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
+import { type TerminalHandle } from "./terminal-demo.ts";
 
 export type PaneStyle = Record<string, number | string>;
 
@@ -16,9 +17,10 @@ export type StageProps = {
 };
 
 export type PaneProps = {
-  name: string;
   className?: string;
+  name?: string;
   style?: PaneStyle;
+  terminal?: TerminalHandle;
 };
 
 export type PaneDefinition = {
@@ -109,8 +111,13 @@ function transformScene(node: ReactNode, replacePane: (pane: PaneElement) => Rea
 }
 
 function paneDefinitionFromElement(element: PaneElement): PaneDefinition {
+  const name = element.props.terminal?.name ?? element.props.name;
+  if (!name) {
+    throw new Error("Pane nodes require a name or terminal");
+  }
+
   return {
-    name: element.props.name,
+    name,
     className: element.props.className,
     style: element.props.style,
   };
