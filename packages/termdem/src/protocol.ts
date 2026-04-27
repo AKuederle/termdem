@@ -2,12 +2,14 @@ import type { ExecResult, PressKey } from "./types.ts";
 
 export type PaneInputMessage = {
   type: "pane.input";
+  id?: string;
   pane: string;
   data: string;
 };
 
 export type PaneResizeMessage = {
   type: "pane.resize";
+  id?: string;
   pane: string;
   cols: number;
   rows: number;
@@ -15,6 +17,7 @@ export type PaneResizeMessage = {
 
 export type PaneTypeMessage = {
   type: "pane.type";
+  id?: string;
   pane: string;
   text: string;
   delayMs?: number;
@@ -22,6 +25,7 @@ export type PaneTypeMessage = {
 
 export type PanePressMessage = {
   type: "pane.press";
+  id?: string;
   pane: string;
   key: PressKey;
 };
@@ -60,6 +64,12 @@ export type PaneExecCompletedMessage = {
   result: ExecResult;
 };
 
+export type PaneActionCompletedMessage = {
+  type: "pane.action.completed";
+  pane: string;
+  id: string;
+};
+
 export type PaneExitMessage = {
   type: "pane.exit";
   pane: string;
@@ -76,6 +86,7 @@ export type PaneErrorMessage = {
 export type PaneServerMessage =
   | PaneMetaMessage
   | PaneOutputMessage
+  | PaneActionCompletedMessage
   | PaneExecCompletedMessage
   | PaneExitMessage
   | PaneErrorMessage;
@@ -97,6 +108,7 @@ export function parsePaneClientMessage(raw: string): PaneClientMessage | null {
       }
       return {
         type: "pane.input",
+        id: optionalString(payload.id),
         pane: payload.pane,
         data: payload.data,
       };
@@ -106,6 +118,7 @@ export function parsePaneClientMessage(raw: string): PaneClientMessage | null {
       }
       return {
         type: "pane.resize",
+        id: optionalString(payload.id),
         pane: payload.pane,
         cols: payload.cols,
         rows: payload.rows,
@@ -119,6 +132,7 @@ export function parsePaneClientMessage(raw: string): PaneClientMessage | null {
       }
       return {
         type: "pane.type",
+        id: optionalString(payload.id),
         pane: payload.pane,
         text: payload.text,
         delayMs: payload.delayMs,
@@ -129,6 +143,7 @@ export function parsePaneClientMessage(raw: string): PaneClientMessage | null {
       }
       return {
         type: "pane.press",
+        id: optionalString(payload.id),
         pane: payload.pane,
         key: payload.key,
       };
@@ -194,6 +209,15 @@ export function parsePaneServerMessage(raw: string): PaneServerMessage | null {
         pane: payload.pane,
         result: payload.result,
       };
+    case "pane.action.completed":
+      if (typeof payload.id !== "string") {
+        return null;
+      }
+      return {
+        type: "pane.action.completed",
+        pane: payload.pane,
+        id: payload.id,
+      };
     case "pane.exit":
       if (!isNullableNumber(payload.exitCode) || !isNullableNumber(payload.signal)) {
         return null;
@@ -233,6 +257,10 @@ function parseObject(raw: string) {
 
 function isPaneName(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 function isExecResult(value: unknown): value is ExecResult {

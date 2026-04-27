@@ -1,6 +1,9 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { inferRecordingFormat, type RecordingFormat } from "./recording-output.ts";
 import { type RecordingCliOptions } from "./recording-config.ts";
+import { runPreviewCommand } from "./preview-server.ts";
 
 export type PreviewCommand = {
   command: "preview";
@@ -21,6 +24,12 @@ export type HelpCommand = {
 
 export type TermdemCommand = HelpCommand | PreviewCommand | RecordCommand;
 
+export type TermdemCliHandlers = {
+  preview?: (command: PreviewCommand) => Promise<void> | void;
+  record?: (command: RecordCommand) => Promise<void> | void;
+  write?: (text: string) => void;
+};
+
 export function parseTermdemCliArgs(argv: readonly string[]): TermdemCommand {
   const [command, ...args] = argv;
 
@@ -39,20 +48,36 @@ export function parseTermdemCliArgs(argv: readonly string[]): TermdemCommand {
   }
 }
 
-export async function runTermdemCli(argv: readonly string[] = process.argv.slice(2)) {
+export async function runTermdemCli(
+  argv: readonly string[] = process.argv.slice(2),
+  handlers: TermdemCliHandlers = {},
+) {
   const command = parseTermdemCliArgs(argv);
+  const write = handlers.write ?? ((text: string) => process.stdout.write(text));
 
   switch (command.command) {
     case "help":
-      process.stdout.write(helpText());
+      write(helpText());
       return;
     case "preview":
-      throw new Error("The preview runtime is not wired into the packaged CLI yet.");
+      await (handlers.preview ?? defaultPreviewHandler)(command);
+      return;
     case "record":
-      throw new Error("The record runtime is not wired into the packaged CLI yet.");
+      await (handlers.record ?? defaultRecordHandler)(command);
+      return;
     default:
       command satisfies never;
   }
+}
+
+async function defaultPreviewHandler(command: PreviewCommand) {
+  await runPreviewCommand({
+    demoPath: command.demoPath,
+  });
+}
+
+function defaultRecordHandler(_command: RecordCommand): Promise<void> {
+  throw new Error("The record runtime is not wired into the packaged CLI yet.");
 }
 
 function parsePreviewArgs(args: readonly string[]): PreviewCommand {
@@ -128,7 +153,15 @@ function helpText() {
 `;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+export function isCliEntrypoint(moduleUrl: string, argvPath: string | undefined) {
+  if (!argvPath) {
+    return false;
+  }
+
+  return realpathSync(fileURLToPath(moduleUrl)) === realpathSync(argvPath);
+}
+
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
   runTermdemCli().catch((error: unknown) => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;

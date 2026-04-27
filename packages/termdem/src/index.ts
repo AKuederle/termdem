@@ -1,5 +1,11 @@
 export { recordBrowserPage, type BrowserRecordingOptions } from "./browser-recorder.ts";
 export {
+  runPreviewCommand,
+  startPreviewServer,
+  type PreviewServerOptions,
+  type TermdemPreviewServer,
+} from "./preview-server.ts";
+export {
   ExecNodeError,
   execNode,
   quoteShellArg,

@@ -22,6 +22,8 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./cli": "./dist/cli.mjs",
+    "./preview-client": "./dist/preview-client.mjs",
+    "./preview-server": "./dist/preview-server.mjs",
     "./protocol": "./dist/protocol.mjs",
     "./scene": "./dist/scene.mjs",
     "./package.json": "./package.json"
@@ -37,13 +39,22 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "@wterm/react": "catalog:",
     "node-pty": "^1.1.0",
     "playwright": "catalog:",
-    "react": "catalog:"
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tailwindcss": "catalog:",
+    "vite": "catalog:",
+    "ws": "catalog:"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@types/ws": "catalog:",
     "@typescript/native-preview": "7.0.0-dev.20260328.1",
     "bumpp": "^11.0.1",
     "typescript": "^6.0.2",

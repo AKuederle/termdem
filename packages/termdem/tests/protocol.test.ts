@@ -19,6 +19,26 @@ test("parsePaneClientMessage accepts exec messages with typing delay", () => {
   });
 });
 
+test("parsePaneClientMessage accepts action ids for ordered keystrokes", () => {
+  const message = parsePaneClientMessage(
+    JSON.stringify({
+      type: "pane.type",
+      id: "action-1",
+      pane: "main",
+      text: "vim README.md",
+      delayMs: 20,
+    }),
+  );
+
+  expect(message).toEqual({
+    type: "pane.type",
+    id: "action-1",
+    pane: "main",
+    text: "vim README.md",
+    delayMs: 20,
+  });
+});
+
 test("parsePaneClientMessage rejects malformed pane messages", () => {
   expect(
     parsePaneClientMessage(
@@ -30,6 +50,22 @@ test("parsePaneClientMessage rejects malformed pane messages", () => {
       }),
     ),
   ).toBeNull();
+});
+
+test("parsePaneServerMessage accepts action completion payloads", () => {
+  const message = parsePaneServerMessage(
+    JSON.stringify({
+      type: "pane.action.completed",
+      pane: "main",
+      id: "action-1",
+    }),
+  );
+
+  expect(message).toEqual({
+    type: "pane.action.completed",
+    pane: "main",
+    id: "action-1",
+  });
 });
 
 test("parsePaneServerMessage accepts command completion payloads", () => {

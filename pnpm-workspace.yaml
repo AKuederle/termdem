@@ -9,6 +9,7 @@ catalog:
   "@types/node": ^24.12.2
   "@types/react": ^19.2.14
   "@types/react-dom": ^19.2.3
+  "@types/ws": ^8.18.1
   "@vitejs/plugin-react": ^6.0.1
   "@wterm/dom": ^0.1.9
   "@wterm/react": ^0.1.9

@@ -5,7 +5,14 @@ export default defineConfig({
     dts: {
       tsgo: true,
     },
-    entry: ["src/index.ts", "src/cli.ts", "src/protocol.ts", "src/scene.ts"],
+    entry: [
+      "src/index.ts",
+      "src/cli.ts",
+      "src/preview-client.tsx",
+      "src/preview-server.ts",
+      "src/protocol.ts",
+      "src/scene.ts",
+    ],
   },
   lint: {
     options: {
