@@ -1,5 +1,6 @@
 import { access, chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { stripVTControlCharacters } from "node:util";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
 import { Dir, execNode, ExecNodeError, quoteShellArg, TmpDir } from "../src/index.ts";
@@ -169,6 +170,31 @@ test("pane sessions disable pagers so exec commands can complete in a tty", asyn
       process.env.GIT_PAGER = previousGitPager;
     }
 
+    await session.close();
+  }
+});
+
+test("pane sessions do not fake echo input while an alternate-screen app is active", async () => {
+  const visibleOutput: string[] = [];
+  const session = await createPaneSession({
+    onOutput(chunk) {
+      visibleOutput.push(chunk);
+    },
+  });
+
+  try {
+    await session.type("printf '\\033[?1049h'; read -rsn 1; printf 'app received\\033[?1049l'");
+    await session.press("Enter");
+    await waitFor(() => visibleOutput.join("").includes("\x1b[?1049h"));
+
+    visibleOutput.length = 0;
+    await session.type("x");
+    await waitFor(() => visibleOutput.join("").includes("app received"));
+
+    const transcript = stripVTControlCharacters(visibleOutput.join(""));
+    expect(transcript).toContain("app received");
+    expect(transcript).not.toContain("x");
+  } finally {
     await session.close();
   }
 });

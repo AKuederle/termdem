@@ -80,6 +80,7 @@ class NodePtyPaneSession implements PaneSession {
   private completedExec: CompletedExecState | null = null;
   private closed = false;
   private bootstrapping = true;
+  private alternateScreenActive = false;
 
   constructor(pty: IPty, prompt: string, onOutput?: (chunk: string) => void) {
     this.pty = pty;
@@ -110,7 +111,7 @@ class NodePtyPaneSession implements PaneSession {
         throw new Error("Unsupported key");
       }
 
-      this.emitVisible("\r\n");
+      this.emitInputVisible("\r\n");
       this.pty.write("\r");
     });
   }
@@ -119,7 +120,7 @@ class NodePtyPaneSession implements PaneSession {
     return this.enqueue(async () => {
       const pending = await this.beginExec(command);
       await this.performType(command, { delayMs: options.typeDelayMs });
-      this.emitVisible("\r\n");
+      this.emitInputVisible("\r\n");
       this.pty.write("\x15");
       this.pty.write(buildExecShellCommand(command, pending.id));
       this.pty.write("\r");
@@ -148,7 +149,7 @@ class NodePtyPaneSession implements PaneSession {
 
   private async performType(text: string, options: TypeOptions = {}) {
     for (const char of text) {
-      this.emitVisible(char);
+      this.emitInputVisible(char);
       this.pty.write(char);
       await sleep(options.delayMs ?? 0);
     }
@@ -184,6 +185,12 @@ class NodePtyPaneSession implements PaneSession {
 
   private emitVisible(chunk: string) {
     this.onOutput?.(chunk);
+  }
+
+  private emitInputVisible(chunk: string) {
+    if (!this.alternateScreenActive) {
+      this.emitVisible(chunk);
+    }
   }
 
   private handlePtyData(data: string) {
@@ -223,6 +230,7 @@ class NodePtyPaneSession implements PaneSession {
       return;
     }
 
+    this.alternateScreenActive = nextAlternateScreenState(this.alternateScreenActive, text);
     this.emitVisible(text);
     if (this.captureActive) {
       this.pendingExec?.rawChunks.push(text);
@@ -329,6 +337,27 @@ function shQuote(value: string) {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function nextAlternateScreenState(current: boolean, text: string) {
+  let next = current;
+  const escape = String.fromCharCode(27);
+  const prefixes = [`${escape}[?47`, `${escape}[?1047`, `${escape}[?1049`];
+
+  for (let index = 0; index < text.length; index++) {
+    for (const prefix of prefixes) {
+      if (!text.startsWith(prefix, index)) {
+        continue;
+      }
+
+      const command = text[index + prefix.length];
+      if (command === "h" || command === "l") {
+        next = command === "h";
+      }
+    }
+  }
+
+  return next;
 }
 
 async function sleep(delayMs: number) {
