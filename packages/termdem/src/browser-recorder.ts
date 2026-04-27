@@ -155,6 +155,7 @@ async function startRecordingDemo(page: Page) {
 async function waitForRecordingDone(page: Page, options: BrowserRecordingOptions) {
   if (options.waitForDone) {
     await options.waitForDone(page);
+    await throwIfRecordingErrored(page);
     return;
   }
 

@@ -145,6 +145,8 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   });
 
   const runPlaybook = useEffectEvent(async (runId: number) => {
+    markRecordingStarted();
+
     if (!demo.script) {
       markRecordingDone(true);
       return;
@@ -595,12 +597,24 @@ function markRecordingReady(ready: boolean) {
   };
 }
 
+function markRecordingStarted() {
+  globalThis.__termdem = {
+    ...globalThis.__termdem,
+    recording: {
+      ...globalThis.__termdem?.recording,
+      done: false,
+      error: undefined,
+    },
+  };
+}
+
 function markRecordingDone(done: boolean) {
   globalThis.__termdem = {
     ...globalThis.__termdem,
     recording: {
       ...globalThis.__termdem?.recording,
       done,
+      error: done ? undefined : globalThis.__termdem?.recording?.error,
     },
   };
 }
