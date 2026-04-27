@@ -1,8 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { createPaneSession } from "../../packages/termdem/src/index.ts";
@@ -13,8 +12,6 @@ import {
 import { defineConfig, type Plugin } from "vite";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 
-const appDir = fileURLToPath(new URL(".", import.meta.url));
-const repoRoot = resolve(appDir, "../..");
 const bridgeToken = randomBytes(24).toString("hex");
 
 type PaneWorkspace = {
@@ -199,16 +196,9 @@ async function wireSession(ws: WebSocket, paneName: string) {
 }
 
 async function createPaneWorkspace(paneName: string): Promise<PaneWorkspace> {
-  if (paneName !== "a") {
-    return {
-      cwd: repoRoot,
-      async dispose() {},
-    };
-  }
-
   const cwd = await mkdtemp(join(tmpdir(), "termdem-pane-"));
-  await writeFile(join(cwd, "alpha.txt"), "alpha file\n", "utf8");
-  await writeFile(join(cwd, "bravo.txt"), "bravo file\n", "utf8");
+  await writeFile(join(cwd, "alpha.txt"), `alpha file from pane ${paneName}\n`, "utf8");
+  await writeFile(join(cwd, "bravo.txt"), `bravo file from pane ${paneName}\n`, "utf8");
 
   return {
     cwd,

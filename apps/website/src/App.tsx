@@ -24,7 +24,16 @@ type PaneScriptApi = {
 type PaneSpec = {
   title: string;
   theme: PaneTheme;
-  script?: (api: PaneScriptApi) => Promise<void>;
+};
+
+type PanePlaybookApi = {
+  pane: (name: PaneName) => PaneScriptApi;
+};
+
+type PaneRuntime = PaneScriptApi & {
+  connectionKey: number;
+  ready: boolean;
+  write(data: string): void;
 };
 
 type PendingExec = {
@@ -33,43 +42,39 @@ type PendingExec = {
 };
 
 const paneSpecs = {
-  a: {
+  A: {
     title: "A",
     theme: "monokai",
-    script: async (api: PaneScriptApi) => {
-      const listing = await api.exec("command ls -1 --color=never", { typeDelayMs: 38 });
-      const firstFile = listing.lines[0];
-      if (!firstFile) {
-        throw new Error("Expected the listing to contain at least one file");
-      }
-
-      await api.exec(`cat '${firstFile}'`, { typeDelayMs: 32 });
-    },
   },
-  b: {
+  B: {
     title: "B",
     theme: "solarized-dark",
-    script: async (api: PaneScriptApi) => {
-      await api.exec("pwd", { typeDelayMs: 16 });
-      await api.exec("printf 'pane b ready\\n'", { typeDelayMs: 16 });
-    },
   },
-  c: {
+  C: {
     title: "C",
     theme: "monokai",
-    script: async (api: PaneScriptApi) => {
-      await api.exec("printf 'pane c spans two rows\\n'", { typeDelayMs: 18 });
-      await api.exec("date", { typeDelayMs: 18 });
-    },
   },
 } satisfies Record<string, PaneSpec>;
+
+async function demoPlaybook(api: PanePlaybookApi) {
+  const listing = await api.pane("A").exec("command ls -1 --color=never", { typeDelayMs: 38 });
+  const file = listing.lines[0];
+  if (!file) {
+    throw new Error("Expected pane A listing to contain at least one file");
+  }
+
+  await api.pane("B").exec(`cat ${quoteShellArg(file)}`, { typeDelayMs: 32 });
+  await api.pane("C").exec(`printf 'pane B read %s\\n' ${quoteShellArg(file)}`, {
+    typeDelayMs: 18,
+  });
+}
 
 const demoScene = (
   <Stage>
     <main className="grid h-dvh min-h-0 grid-cols-1 grid-rows-3 gap-px bg-[#3a3a3a] text-slate-100 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:grid-rows-2">
-      <Pane name="a" className="min-h-0 min-w-0" />
-      <Pane name="b" className="min-h-0 min-w-0 lg:row-start-2" />
-      <Pane name="c" className="min-h-0 min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1" />
+      <Pane name="A" className="min-h-0 min-w-0" />
+      <Pane name="B" className="min-h-0 min-w-0 lg:row-start-2" />
+      <Pane name="C" className="min-h-0 min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1" />
     </main>
   </Stage>
 );
@@ -85,37 +90,26 @@ function socketUrlForPane(paneName: string) {
   return `${protocol}//${window.location.host}/panes/${paneName}?token=${encodeURIComponent(bridgeToken)}`;
 }
 
-function PaneTerminalCard({ pane }: { pane: PaneDefinition }) {
+function PaneTerminalCard({
+  onRuntimeChange,
+  pane,
+}: {
+  onRuntimeChange: (name: PaneName, runtime: PaneRuntime) => void;
+  pane: PaneDefinition;
+}) {
   const spec = getPaneSpec(pane.name);
   const { connectionKey, exec, meta, ref, requestResize, status, write } = usePaneConnection(
     pane.name,
   );
-  const runningScriptKeyRef = useRef<number | null>(null);
-
-  const runPaneScript = useEffectEvent(async () => {
-    if (!spec.script) {
-      return;
-    }
-
-    try {
-      await spec.script({ exec });
-    } catch (error) {
-      write(`\r\n\x1b[31m[script error] ${formatError(error)}\x1b[0m\r\n`);
-    }
-  });
 
   useEffect(() => {
-    if (!spec.script || status !== "open" || !meta) {
-      return;
-    }
-
-    if (runningScriptKeyRef.current === connectionKey) {
-      return;
-    }
-
-    runningScriptKeyRef.current = connectionKey;
-    void runPaneScript();
-  }, [connectionKey, meta, spec.script, status]);
+    onRuntimeChange(pane.name as PaneName, {
+      connectionKey,
+      exec,
+      ready: status === "open" && Boolean(meta),
+      write,
+    });
+  }, [connectionKey, meta, pane.name, status]);
 
   return (
     <article className={`${paneFrameClassName} ${pane.className ?? ""}`} style={pane.style}>
@@ -290,6 +284,21 @@ function formatError(error: unknown) {
   return String(error);
 }
 
+function createPlaybookApi(runtimes: Map<PaneName, PaneRuntime>): PanePlaybookApi {
+  return {
+    pane(name) {
+      const runtime = runtimes.get(name);
+      if (!runtime?.ready) {
+        throw new Error(`Pane "${name}" is not ready`);
+      }
+
+      return {
+        exec: (command, options) => runtime.exec(command, options),
+      };
+    },
+  };
+}
+
 function getPaneSpec(name: string) {
   const spec = paneSpecs[name as PaneName] as PaneSpec | undefined;
   if (!spec) {
@@ -297,6 +306,10 @@ function getPaneSpec(name: string) {
   }
 
   return spec;
+}
+
+function quoteShellArg(value: string) {
+  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 function getBridgeToken() {
@@ -311,10 +324,44 @@ function getBridgeToken() {
 }
 
 export default function App() {
+  const paneRuntimesRef = useRef(new Map<PaneName, PaneRuntime>());
+  const [runtimeVersion, setRuntimeVersion] = useState(0);
+  const runningPlaybookKeyRef = useRef<string | null>(null);
+
+  const onRuntimeChange = useEffectEvent((name: PaneName, runtime: PaneRuntime) => {
+    paneRuntimesRef.current.set(name, runtime);
+    setRuntimeVersion((version) => version + 1);
+  });
+
+  const runPlaybook = useEffectEvent(async () => {
+    try {
+      await demoPlaybook(createPlaybookApi(paneRuntimesRef.current));
+    } catch (error) {
+      const firstPane = paneRuntimesRef.current.get("A");
+      firstPane?.write(`\r\n\x1b[31m[playbook error] ${formatError(error)}\x1b[0m\r\n`);
+    }
+  });
+
+  useEffect(() => {
+    const paneNames = Object.keys(paneSpecs) as PaneName[];
+    const runtimes = paneRuntimesRef.current;
+    if (!paneNames.every((name) => runtimes.get(name)?.ready)) {
+      return;
+    }
+
+    const playbookKey = paneNames.map((name) => runtimes.get(name)?.connectionKey).join(":");
+    if (runningPlaybookKeyRef.current === playbookKey) {
+      return;
+    }
+
+    runningPlaybookKeyRef.current = playbookKey;
+    void runPlaybook();
+  }, [runtimeVersion]);
+
   return (
     <>
       {renderStageScene(demoScene, (pane) => (
-        <PaneTerminalCard key={pane.name} pane={pane} />
+        <PaneTerminalCard key={pane.name} onRuntimeChange={onRuntimeChange} pane={pane} />
       ))}
     </>
   );
