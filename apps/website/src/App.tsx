@@ -25,8 +25,6 @@ type PaneScriptApi = {
 type PaneSpec = {
   title: string;
   eyebrow: string;
-  note: string;
-  footer: string;
   theme: PaneTheme;
   autoFocus?: boolean;
   script?: (api: PaneScriptApi) => Promise<void>;
@@ -39,10 +37,8 @@ type PendingExec = {
 
 const paneSpecs = {
   a: {
-    title: "Pane A",
-    eyebrow: "Scripted",
-    note: "Runs ls, prunes lines, then cats the first listed file.",
-    footer: "isolated workspace",
+    title: "a",
+    eyebrow: "script",
     theme: "monokai",
     autoFocus: true,
     script: async (api: PaneScriptApi) => {
@@ -56,10 +52,8 @@ const paneSpecs = {
     },
   },
   b: {
-    title: "Pane B",
-    eyebrow: "Worker",
-    note: "Independent PTY in the repo root.",
-    footer: "repo workspace",
+    title: "b",
+    eyebrow: "worker",
     theme: "solarized-dark",
     script: async (api: PaneScriptApi) => {
       await api.exec("pwd", { typeDelayMs: 16 });
@@ -67,11 +61,9 @@ const paneSpecs = {
     },
   },
   c: {
-    title: "Pane C",
-    eyebrow: "Tall Pane",
-    note: "Spans both rows and resizes with the browser.",
-    footer: "right column",
-    theme: "light",
+    title: "c",
+    eyebrow: "span",
+    theme: "monokai",
     script: async (api: PaneScriptApi) => {
       await api.exec("printf 'pane c spans two rows\\n'", { typeDelayMs: 18 });
       await api.exec("date", { typeDelayMs: 18 });
@@ -81,7 +73,7 @@ const paneSpecs = {
 
 const demoScene = (
   <Stage>
-    <main className="grid h-dvh min-h-0 grid-cols-1 grid-rows-3 gap-3 bg-[#141414] p-3 text-slate-100 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:grid-rows-2">
+    <main className="grid h-dvh min-h-0 grid-cols-1 grid-rows-3 gap-px bg-[#3a3a3a] text-slate-100 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:grid-rows-2">
       <Pane name="a" className="min-h-0 min-w-0" />
       <Pane name="b" className="min-h-0 min-w-0 lg:row-start-2" />
       <Pane name="c" className="min-h-0 min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1" />
@@ -90,13 +82,7 @@ const demoScene = (
 );
 
 const paneFrameClassName =
-  "relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-white/12 bg-[#202020]/95 shadow-2xl shadow-black/30 ring-1 ring-white/5";
-
-const paneHeaderClassName =
-  "relative z-10 flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3";
-
-const badgeClassName =
-  "inline-flex min-h-6 items-center rounded border border-white/10 bg-white/5 px-2 font-mono text-[11px] font-medium leading-none text-slate-300";
+  "flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#101010] text-slate-100";
 
 function socketUrlForPane(paneName: string) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -158,43 +144,30 @@ function PaneTerminalCard({ pane }: { pane: PaneDefinition }) {
 
   return (
     <article className={`${paneFrameClassName} ${pane.className ?? ""}`} style={pane.style}>
-      <header className={paneHeaderClassName}>
-        <div>
-          <p className="m-0 font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300">
-            {spec.eyebrow}
-          </p>
-          <h2 className="m-0 mt-1 text-base font-semibold leading-tight text-white">
-            {spec.title}
-          </h2>
+      <header className="flex h-7 shrink-0 items-center justify-between gap-2 border-b border-[#3a3a3a] bg-[#1b1b1b] px-2 font-mono text-[11px] leading-none">
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="m-0 text-[11px] font-semibold text-cyan-300">{spec.title}</h2>
+          <span className="text-slate-500">{spec.eyebrow}</span>
+          <span className={status === "open" ? "text-emerald-300" : "text-amber-200"}>
+            {status}
+          </span>
+          <span className={scriptState === "done" ? "text-emerald-300" : "text-slate-400"}>
+            {scriptState}
+          </span>
+          <span className="min-w-0 truncate text-slate-500">{meta?.cwd ?? "starting"}</span>
         </div>
         <button
           type="button"
-          className="rounded border border-white/15 bg-white/8 px-2.5 py-1.5 font-mono text-[11px] font-medium leading-none text-slate-200 hover:bg-white/12 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+          className="shrink-0 border-l border-[#3a3a3a] pl-2 text-slate-400 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-cyan-300"
           onClick={reconnect}
         >
-          reconnect
+          rerun
         </button>
       </header>
 
-      <div className="relative z-10 flex flex-wrap gap-1.5 px-4 py-2">
-        <span
-          className={`${badgeClassName} data-[status=closed]:border-red-400/30 data-[status=closed]:text-red-200 data-[status=connecting]:border-amber-300/30 data-[status=connecting]:text-amber-200 data-[status=error]:border-red-400/30 data-[status=error]:text-red-200 data-[status=open]:border-emerald-300/30 data-[status=open]:text-emerald-200`}
-          data-status={status}
-        >
-          {status}
-        </span>
-        <span
-          className={`${badgeClassName} data-[script=done]:border-emerald-300/30 data-[script=done]:text-emerald-200 data-[script=error]:border-red-400/30 data-[script=error]:text-red-200 data-[script=running]:border-blue-300/30 data-[script=running]:text-blue-200`}
-          data-script={scriptState}
-        >
-          {scriptState}
-        </span>
-        <span className={`${badgeClassName} max-w-full truncate`}>{spec.note}</span>
-      </div>
-
       <Terminal
         ref={ref}
-        className="relative z-10 mx-3 min-h-0 flex-1 overflow-hidden rounded border border-white/10"
+        className="min-h-0 flex-1 overflow-hidden"
         theme={spec.theme}
         autoResize
         cursorBlink
@@ -206,13 +179,6 @@ function PaneTerminalCard({ pane }: { pane: PaneDefinition }) {
         onData={sendInput}
         onResize={requestResize}
       />
-
-      <footer className="relative z-10 flex min-h-10 flex-wrap items-center justify-between gap-2 px-4 py-2">
-        <span className={`${badgeClassName} max-w-full truncate`}>
-          {meta?.cwd ?? "waiting for pane session"}
-        </span>
-        <span className={badgeClassName}>{spec.footer}</span>
-      </footer>
     </article>
   );
 }
