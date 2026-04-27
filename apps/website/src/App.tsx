@@ -16,6 +16,7 @@ import type { ExecResult } from "../../../packages/termdem/src/types.ts";
 type PaneTheme = "light" | "monokai" | "solarized-dark";
 type PaneStatus = "connecting" | "open" | "closed" | "error";
 type PaneName = keyof typeof paneSpecs;
+type PreviewMode = "running" | "stopped";
 
 type PaneScriptApi = {
   exec(command: string, options?: { typeDelayMs?: number }): Promise<ExecResult>;
@@ -284,7 +285,10 @@ function formatError(error: unknown) {
   return String(error);
 }
 
-function createPlaybookApi(runtimes: Map<PaneName, PaneRuntime>): PanePlaybookApi {
+function createPlaybookApi(
+  runtimes: Map<PaneName, PaneRuntime>,
+  waitForPlaybookActive: () => Promise<void>,
+): PanePlaybookApi {
   return {
     pane(name) {
       const runtime = runtimes.get(name);
@@ -293,7 +297,12 @@ function createPlaybookApi(runtimes: Map<PaneName, PaneRuntime>): PanePlaybookAp
       }
 
       return {
-        exec: (command, options) => runtime.exec(command, options),
+        async exec(command, options) {
+          await waitForPlaybookActive();
+          const result = await runtime.exec(command, options);
+          await waitForPlaybookActive();
+          return result;
+        },
       };
     },
   };
@@ -323,26 +332,149 @@ function getBridgeToken() {
   return token;
 }
 
+function PreviewOverlay({
+  mode,
+  onHide,
+  onRestart,
+  onResume,
+  onStop,
+}: {
+  mode: PreviewMode;
+  onHide: () => void;
+  onRestart: () => void;
+  onResume: () => void;
+  onStop: () => void;
+}) {
+  return (
+    <div className="fixed right-3 top-3 z-50 flex items-center gap-2 border border-cyan-300/30 bg-black/80 px-2 py-1 font-mono text-[11px] text-slate-200 shadow-xl shadow-black/30 backdrop-blur">
+      <span className="text-cyan-300">termdem</span>
+      <span className={mode === "running" ? "text-emerald-300" : "text-amber-200"}>{mode}</span>
+      {mode === "running" ? (
+        <button className="text-slate-300 hover:text-white" type="button" onClick={onStop}>
+          stop
+        </button>
+      ) : (
+        <button className="text-slate-300 hover:text-white" type="button" onClick={onResume}>
+          resume
+        </button>
+      )}
+      <button className="text-slate-300 hover:text-white" type="button" onClick={onRestart}>
+        restart
+      </button>
+      <button className="text-slate-500 hover:text-white" type="button" onClick={onHide}>
+        hide
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const paneRuntimesRef = useRef(new Map<PaneName, PaneRuntime>());
+  const playbookRunIdRef = useRef(0);
+  const previewModeRef = useRef<PreviewMode>("running");
+  const resumeWaitersRef = useRef<Array<() => void>>([]);
   const [runtimeVersion, setRuntimeVersion] = useState(0);
+  const [overlayVisible, setOverlayVisible] = useState(false);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("running");
+  const [sessionKey, setSessionKey] = useState(0);
   const runningPlaybookKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    previewModeRef.current = previewMode;
+  }, [previewMode]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === ".") {
+        event.preventDefault();
+        setOverlayVisible((visible) => !visible);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        setOverlayVisible(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
 
   const onRuntimeChange = useEffectEvent((name: PaneName, runtime: PaneRuntime) => {
     paneRuntimesRef.current.set(name, runtime);
     setRuntimeVersion((version) => version + 1);
   });
 
-  const runPlaybook = useEffectEvent(async () => {
+  const resumePlaybook = useEffectEvent(() => {
+    previewModeRef.current = "running";
+    setPreviewMode("running");
+
+    const waiters = resumeWaitersRef.current.splice(0);
+    for (const resolve of waiters) {
+      resolve();
+    }
+  });
+
+  const stopPlaybook = useEffectEvent(() => {
+    previewModeRef.current = "stopped";
+    setPreviewMode("stopped");
+  });
+
+  const restartPreview = useEffectEvent(() => {
+    playbookRunIdRef.current += 1;
+    paneRuntimesRef.current.clear();
+    runningPlaybookKeyRef.current = null;
+    resumePlaybook();
+
+    const waiters = resumeWaitersRef.current.splice(0);
+    for (const resolve of waiters) {
+      resolve();
+    }
+
+    setRuntimeVersion((version) => version + 1);
+    setSessionKey((key) => key + 1);
+  });
+
+  const waitForPlaybookActive = useEffectEvent(async (runId: number) => {
+    while (previewModeRef.current !== "running") {
+      if (playbookRunIdRef.current !== runId) {
+        throw new Error("Playbook restarted");
+      }
+
+      await new Promise<void>((resolve) => {
+        resumeWaitersRef.current.push(resolve);
+      });
+    }
+
+    if (playbookRunIdRef.current !== runId) {
+      throw new Error("Playbook restarted");
+    }
+  });
+
+  const runPlaybook = useEffectEvent(async (runId: number) => {
     try {
-      await demoPlaybook(createPlaybookApi(paneRuntimesRef.current));
+      await demoPlaybook(
+        createPlaybookApi(paneRuntimesRef.current, () => {
+          return waitForPlaybookActive(runId);
+        }),
+      );
     } catch (error) {
+      if (formatError(error) === "Playbook restarted") {
+        return;
+      }
+
       const firstPane = paneRuntimesRef.current.get("A");
       firstPane?.write(`\r\n\x1b[31m[playbook error] ${formatError(error)}\x1b[0m\r\n`);
     }
   });
 
   useEffect(() => {
+    if (previewMode !== "running") {
+      return;
+    }
+
     const paneNames = Object.keys(paneSpecs) as PaneName[];
     const runtimes = paneRuntimesRef.current;
     if (!paneNames.every((name) => runtimes.get(name)?.ready)) {
@@ -355,14 +487,35 @@ export default function App() {
     }
 
     runningPlaybookKeyRef.current = playbookKey;
-    void runPlaybook();
-  }, [runtimeVersion]);
+    void runPlaybook(playbookRunIdRef.current);
+  }, [previewMode, runtimeVersion]);
 
   return (
     <>
       {renderStageScene(demoScene, (pane) => (
-        <PaneTerminalCard key={pane.name} onRuntimeChange={onRuntimeChange} pane={pane} />
+        <PaneTerminalCard
+          key={`${sessionKey}:${pane.name}`}
+          onRuntimeChange={onRuntimeChange}
+          pane={pane}
+        />
       ))}
+      {overlayVisible ? (
+        <PreviewOverlay
+          mode={previewMode}
+          onHide={() => {
+            setOverlayVisible(false);
+          }}
+          onRestart={() => {
+            restartPreview();
+          }}
+          onResume={() => {
+            resumePlaybook();
+          }}
+          onStop={() => {
+            stopPlaybook();
+          }}
+        />
+      ) : null}
     </>
   );
 }
