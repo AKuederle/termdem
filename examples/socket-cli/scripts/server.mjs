@@ -3,11 +3,12 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
-import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptPath = fileURLToPath(import.meta.url);
-const statePath = join(dirname(scriptPath), ".server-state.json");
+const statePath = join(tmpdir(), "termdem-socket-cli-server-state.json");
 const command = process.argv[2];
 
 switch (command) {

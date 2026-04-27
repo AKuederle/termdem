@@ -3,10 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "tsc --noEmit",
-    "createDemo": "termdem record ./demo.tsx ./git-vim.webm",
-    "previewDemo": "termdem preview ./demo.tsx",
-    "recordDemo": "termdem record ./demo.tsx ./git-vim.webm"
+    "check": "pnpm --filter @akuederle/termdem build && tsc --noEmit",
+    "previewDemo": "termdem preview ./demo.tsx"
   },
   "devDependencies": {
     "@akuederle/termdem": "workspace:*",

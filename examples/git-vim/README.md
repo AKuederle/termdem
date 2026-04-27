@@ -26,12 +26,10 @@ Package scripts:
 ```bash
 pnpm run check
 pnpm run previewDemo
-pnpm run createDemo
 ```
 
-Equivalent direct CLI commands:
+Equivalent direct CLI command:
 
 ```bash
 termdem preview ./demo.tsx
-termdem record ./demo.tsx ./git-vim.webm
 ```

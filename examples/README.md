@@ -18,5 +18,4 @@ From an example package, the intended workflow is:
 
 ```bash
 pnpm run previewDemo
-pnpm run createDemo
 ```
