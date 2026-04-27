@@ -163,7 +163,9 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
       }
 
       const firstPane = paneRuntimesRef.current.get(paneNames[0] ?? "");
-      firstPane?.write(`\r\n\x1b[31m[playbook error] ${formatError(error)}\x1b[0m\r\n`);
+      const message = formatError(error);
+      firstPane?.write(`\r\n\x1b[31m[playbook error] ${message}\x1b[0m\r\n`);
+      markRecordingError(message);
     }
   });
 
@@ -590,6 +592,16 @@ function markRecordingDone(done: boolean) {
   };
 }
 
+function markRecordingError(error: string) {
+  globalThis.__termdem = {
+    ...globalThis.__termdem,
+    recording: {
+      ...globalThis.__termdem?.recording,
+      error,
+    },
+  };
+}
+
 function formatError(error: unknown) {
   if (error instanceof Error) {
     return error.message;
@@ -606,6 +618,7 @@ declare global {
         };
         recording?: {
           done?: boolean;
+          error?: string;
           ready?: boolean;
         };
       }

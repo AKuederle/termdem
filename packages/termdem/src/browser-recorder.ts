@@ -9,6 +9,7 @@ import { inferRecordingFormat, type RecordingFormat } from "./recording-output.t
 export type BrowserRecordingOptions = {
   doneTimeoutMs?: number;
   format?: RecordingFormat;
+  onProgress?: (message: string) => void;
   outputPath: string;
   size: DemoSize;
   url: string;
@@ -26,6 +27,7 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
   let browser: Browser | null = null;
 
   try {
+    options.onProgress?.("Launching Chromium");
     browser = await chromium.launch({
       executablePath: process.env.TERMDEM_CHROMIUM_EXECUTABLE_PATH,
       headless: true,
@@ -39,6 +41,7 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
     });
     const recordingStartedAt = Date.now();
     const page = await context.newPage();
+    options.onProgress?.("Loading preview");
     await page.goto(recordingUrl(options.url));
 
     const video = page.video();
@@ -46,12 +49,15 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
       throw new Error("Playwright did not create a video for the recording page.");
     }
 
+    options.onProgress?.("Waiting for terminal panes");
     await waitForRecordingReady(page);
     const readyAt = Date.now();
     await page.waitForTimeout(recordingLeadInMs);
     const trimStartSeconds = Math.max(0, (readyAt - recordingStartedAt) / 1000 - 0.05);
+    options.onProgress?.("Running demo script");
     await startRecordingDemo(page);
     await waitForRecordingDone(page, options);
+    options.onProgress?.("Saving raw browser recording");
     await context.close();
     await video.saveAs(rawVideoPath);
 
@@ -63,6 +69,7 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
         viewportSize: options.viewportSize,
       })
     ) {
+      options.onProgress?.("Transcoding recording");
       await transcodeWebm(rawVideoPath, options.outputPath, {
         format,
         size: options.size,
@@ -71,6 +78,7 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
     } else {
       await rename(rawVideoPath, options.outputPath);
     }
+    options.onProgress?.(`Wrote ${options.outputPath}`);
   } finally {
     await browser?.close();
     await rm(tempDir, { recursive: true, force: true });
@@ -132,7 +140,10 @@ function recordingUrl(url: string) {
 }
 
 async function waitForRecordingReady(page: Page) {
-  await page.waitForFunction(() => globalThis.__termdem?.recording?.ready === true);
+  await page.waitForFunction(
+    () => globalThis.__termdem?.recording?.ready === true || globalThis.__termdem?.recording?.error,
+  );
+  await throwIfRecordingErrored(page);
 }
 
 async function startRecordingDemo(page: Page) {
@@ -147,9 +158,21 @@ async function waitForRecordingDone(page: Page, options: BrowserRecordingOptions
     return;
   }
 
-  await page.waitForFunction(() => globalThis.__termdem?.recording?.done === true, null, {
-    timeout: options.doneTimeoutMs ?? defaultDoneTimeoutMs,
-  });
+  await page.waitForFunction(
+    () => globalThis.__termdem?.recording?.done === true || globalThis.__termdem?.recording?.error,
+    null,
+    {
+      timeout: options.doneTimeoutMs ?? defaultDoneTimeoutMs,
+    },
+  );
+  await throwIfRecordingErrored(page);
+}
+
+async function throwIfRecordingErrored(page: Page) {
+  const error = await page.evaluate(() => globalThis.__termdem?.recording?.error);
+  if (error) {
+    throw new Error(`Demo script failed while recording: ${error}`);
+  }
 }
 
 async function transcodeWebm(
@@ -198,6 +221,7 @@ declare global {
         };
         recording?: {
           done?: boolean;
+          error?: string;
           ready?: boolean;
         };
       }

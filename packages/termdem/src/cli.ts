@@ -42,6 +42,7 @@ export type TermdemCliHandlers = {
 export type RecordCommandDependencies = {
   recordBrowserPage: (options: {
     format: RecordingFormat;
+    onProgress?: (message: string) => void;
     outputPath: string;
     size: ResolvedRecordingConfig["size"];
     url: string;
@@ -124,6 +125,9 @@ export async function runRecordCommand(
     const recordingConfig = resolveRecordingConfig(previewServer.demo.config, command.cliOptions);
     await dependencies.recordBrowserPage({
       format: command.format,
+      onProgress(message) {
+        process.stderr.write(`termdem record: ${message}\n`);
+      },
       outputPath: command.outputPath,
       size: recordingConfig.size,
       url,
