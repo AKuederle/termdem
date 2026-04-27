@@ -1,0 +1,17 @@
+{
+  "name": "@termdem-examples/git-vim",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "createDemo": "termdem record ./demo.tsx ./git-vim.webm",
+    "previewDemo": "termdem preview ./demo.tsx",
+    "recordDemo": "termdem record ./demo.tsx ./git-vim.webm"
+  },
+  "devDependencies": {
+    "@akuederle/termdem": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "typescript": "catalog:"
+  }
+}

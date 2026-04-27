@@ -1,28 +1,12 @@
-import { cp } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  Pane,
-  Stage,
-  TmpDir,
-  createTerminalDemo,
-  execNode,
-  quoteShellArg,
-} from "@akuederle/termdem";
+import { Dir, Pane, Stage, createTerminalDemo, execNode, quoteShellArg } from "@akuederle/termdem";
 
-const exampleDir = dirname(fileURLToPath(import.meta.url));
-
-const workspace = new TmpDir({
-  setup: async (dir) => {
-    await cp(join(exampleDir, "scripts"), join(dir, "scripts"), { recursive: true });
-  },
-});
+const workspace = new Dir(() => decodeURIComponent(new URL(".", import.meta.url).pathname));
 
 export const { script, terminals } = createTerminalDemo(
   [
     {
       cleanup: async ({ cwd }) => {
-        await execNode(join(cwd, "scripts/server.mjs"), ["cleanup"], { reject: false });
+        await execNode(`${cwd}/scripts/server.mjs`, ["cleanup"], { reject: false });
       },
       name: "server",
       pwd: workspace,

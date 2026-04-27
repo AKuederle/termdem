@@ -18,8 +18,20 @@ The terminal workspace uses `new TmpDir({ setup })`, so every preview/restart ge
 The demo config sets `size: 1280x720`. A future record command can override it with
 `--size <width>x<height>`.
 
-Preview command once the CLI exists:
+This folder is a standalone workspace package. It depends on `@akuederle/termdem` as a dev
+dependency so `demo.tsx` imports the package exactly like a user project would.
+
+Package scripts:
 
 ```bash
-npx @akuederle/termdem preview ./examples/git-vim/demo.tsx
+pnpm run check
+pnpm run previewDemo
+pnpm run createDemo
+```
+
+Equivalent direct CLI commands:
+
+```bash
+termdem preview ./demo.tsx
+termdem record ./demo.tsx ./git-vim.webm
 ```

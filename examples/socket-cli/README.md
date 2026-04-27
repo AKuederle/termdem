@@ -24,8 +24,20 @@ The demo config intentionally separates `size: 1920x1080` from `viewportSize: 14
 the record contract. A future CLI can override both with `--size`, or override just the viewport with
 `--viewportSize` in addition to `--size`.
 
-Preview command once the CLI exists:
+This folder is a standalone workspace package. It depends on `@akuederle/termdem` as a dev
+dependency so `demo.tsx` imports the package exactly like a user project would.
+
+Package scripts:
 
 ```bash
-npx @akuederle/termdem preview ./examples/socket-cli/demo.tsx
+pnpm run check
+pnpm run previewDemo
+pnpm run createDemo
+```
+
+Equivalent direct CLI commands:
+
+```bash
+termdem preview ./demo.tsx
+termdem record ./demo.tsx ./socket-cli.webm
 ```

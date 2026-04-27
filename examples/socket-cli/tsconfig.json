@@ -5,8 +5,7 @@
     "moduleResolution": "NodeNext",
     "noEmit": true,
     "strict": true,
-    "target": "ES2022",
-    "types": ["node"]
+    "target": "ES2022"
   },
-  "include": ["./*/demo.tsx"]
+  "include": ["./demo.tsx"]
 }
