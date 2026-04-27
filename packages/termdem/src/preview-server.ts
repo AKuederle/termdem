@@ -81,7 +81,7 @@ export async function startPreviewServer(
     await writeFile(
       join(root, "src", "style.css"),
       previewCss({
-        sourceRoots: [dirname(demoPath), packageRuntimeDir],
+        sourceRoots: uniqueSourceRoots([dirname(demoPath), packageRuntimeDir, process.cwd()]),
       }),
       "utf8",
     );
@@ -551,6 +551,10 @@ body {
   box-sizing: border-box;
 }
 `;
+}
+
+function uniqueSourceRoots(sourceRoots: string[]) {
+  return [...new Set(sourceRoots)];
 }
 
 function previewEntrySource(demoPath: string) {

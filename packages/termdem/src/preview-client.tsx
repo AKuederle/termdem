@@ -58,13 +58,14 @@ export function renderPreviewApp(demo: PreviewDemoModule) {
 function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   const scene = useInitialValue(() => createDemoScene(demo));
   const paneNames = useInitialValue(() => collectPaneDefinitions(scene).map((pane) => pane.name));
+  const initialPreviewMode = useInitialValue(() => readInitialPreviewMode());
   const paneRuntimesRef = useRef(new Map<string, PaneRuntime>());
   const playbookRunIdRef = useRef(0);
-  const previewModeRef = useRef<PreviewMode>("running");
+  const previewModeRef = useRef<PreviewMode>(initialPreviewMode);
   const resumeWaitersRef = useRef<Array<() => void>>([]);
   const runningPlaybookKeyRef = useRef<string | null>(null);
   const [overlayVisible, setOverlayVisible] = useState(false);
-  const [previewMode, setPreviewMode] = useState<PreviewMode>("running");
+  const [previewMode, setPreviewMode] = useState<PreviewMode>(initialPreviewMode);
   const [runtimeVersion, setRuntimeVersion] = useState(0);
   const [sessionKey, setSessionKey] = useState(0);
 
@@ -165,6 +166,30 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
       firstPane?.write(`\r\n\x1b[31m[playbook error] ${formatError(error)}\x1b[0m\r\n`);
     }
   });
+
+  useEffect(() => {
+    markRecordingDone(false);
+  }, []);
+
+  useEffect(() => {
+    globalThis.__termdem = {
+      ...globalThis.__termdem,
+      controls: {
+        start: resumePlaybook,
+      },
+    };
+
+    return () => {
+      if (globalThis.__termdem?.controls?.start === resumePlaybook) {
+        delete globalThis.__termdem.controls;
+      }
+    };
+  }, [resumePlaybook]);
+
+  useEffect(() => {
+    const runtimes = paneRuntimesRef.current;
+    markRecordingReady(paneNames.every((name) => runtimes.get(name)?.ready));
+  }, [paneNames, runtimeVersion]);
 
   useEffect(() => {
     if (previewMode !== "running") {
@@ -531,10 +556,32 @@ function useInitialValue<T>(createValue: () => T) {
   return valueRef.current.value;
 }
 
+function readInitialPreviewMode(): PreviewMode {
+  if (globalThis.location?.search) {
+    const params = new URLSearchParams(globalThis.location.search);
+    if (params.get("termdem_autostart") === "0") {
+      return "stopped";
+    }
+  }
+
+  return "running";
+}
+
+function markRecordingReady(ready: boolean) {
+  globalThis.__termdem = {
+    ...globalThis.__termdem,
+    recording: {
+      ...globalThis.__termdem?.recording,
+      ready,
+    },
+  };
+}
+
 function markRecordingDone(done: boolean) {
   globalThis.__termdem = {
     ...globalThis.__termdem,
     recording: {
+      ...globalThis.__termdem?.recording,
       done,
     },
   };
@@ -551,8 +598,12 @@ function formatError(error: unknown) {
 declare global {
   var __termdem:
     | {
+        controls?: {
+          start?: () => void;
+        };
         recording?: {
           done?: boolean;
+          ready?: boolean;
         };
       }
     | undefined;

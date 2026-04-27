@@ -20,7 +20,7 @@ The demo proves a dynamic workflow:
 This is the intended usage pattern for demos where one pane discovers runtime data and later panes
 depend on it.
 
-The demo config intentionally separates `size: 1920x1080` from `viewportSize: 1440x900` to document
+The demo config intentionally separates `size: 1920x1080` from `viewportSize: 1440x810` to document
 the record contract. The CLI can override both with `--size`, or override just the viewport with
 `--viewportSize` in addition to `--size`.
 

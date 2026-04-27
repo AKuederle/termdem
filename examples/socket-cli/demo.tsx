@@ -53,7 +53,7 @@ const demo = createTerminalDemo(
   },
   {
     size: { width: 1920, height: 1080 },
-    viewportSize: { width: 1440, height: 900 },
+    viewportSize: { width: 1440, height: 810 },
   },
 );
 
