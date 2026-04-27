@@ -1,6 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import {
   buildFfmpegTranscodeArgs,
+  recordingHasTimedOut,
   sizesMatch,
   videoNeedsTranscode,
 } from "../src/browser-recorder.ts";
@@ -78,4 +79,9 @@ test("buildFfmpegTranscodeArgs preserves aspect ratio and pads to the requested 
   ).toContain(
     "trim=start=0.350,setpts=PTS-STARTPTS,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1",
   );
+});
+
+test("recording timeout value of zero disables the done timeout", () => {
+  expect(recordingHasTimedOut(1_000, 61_000, 0)).toBe(false);
+  expect(recordingHasTimedOut(1_000, 61_000, 60_000)).toBe(true);
 });

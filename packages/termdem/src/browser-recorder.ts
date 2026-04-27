@@ -184,7 +184,7 @@ async function waitForRecordingDone(page: Page, options: BrowserRecordingOptions
       lastStatus = nextStatus;
     }
 
-    if (now - startedAt >= timeoutMs) {
+    if (recordingHasTimedOut(startedAt, now, timeoutMs)) {
       throw new Error(`Timed out waiting for demo script to finish${action}`);
     }
 
@@ -205,6 +205,10 @@ async function recordingStatus(page: Page) {
     done: globalThis.__termdem?.recording?.done === true,
     error: globalThis.__termdem?.recording?.error,
   }));
+}
+
+export function recordingHasTimedOut(startedAt: number, now: number, timeoutMs: number) {
+  return timeoutMs > 0 && now - startedAt >= timeoutMs;
 }
 
 async function transcodeWebm(
