@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, test } from "vite-plus/test";
-import { isCliEntrypoint, parseTermdemCliArgs, runTermdemCli } from "../src/cli.ts";
+import {
+  isCliEntrypoint,
+  parseTermdemCliArgs,
+  runRecordCommand,
+  runTermdemCli,
+} from "../src/cli.ts";
 import { inferRecordingFormat } from "../src/recording-output.ts";
 
 test("parseTermdemCliArgs parses preview commands", () => {
@@ -94,6 +99,51 @@ test("runTermdemCli writes help through the injected writer", async () => {
   });
 
   expect(output).toContain("termdem preview <demo.tsx>");
+});
+
+test("runRecordCommand records the headless preview and closes the server", async () => {
+  const events: string[] = [];
+
+  await runRecordCommand(
+    {
+      cliOptions: {
+        size: "1920x1080",
+        viewportSize: "1440x900",
+      },
+      command: "record",
+      demoPath: "demo.tsx",
+      format: "webm",
+      outputPath: "demo.webm",
+    },
+    {
+      async recordBrowserPage(options) {
+        events.push(
+          `record:${options.url}:${options.outputPath}:${options.size.width}x${options.size.height}:${options.viewportSize.width}x${options.viewportSize.height}`,
+        );
+      },
+      async startPreviewServer(options) {
+        events.push(`preview:${options.demoPath}:${options.open}`);
+
+        return {
+          demo: {
+            config: {
+              size: { width: 1280, height: 720 },
+            },
+          },
+          urls: ["http://127.0.0.1:5173/"],
+          async close() {
+            events.push("close");
+          },
+        };
+      },
+    },
+  );
+
+  expect(events).toEqual([
+    "preview:demo.tsx:false",
+    "record:http://127.0.0.1:5173/:demo.webm:1920x1080:1440x900",
+    "close",
+  ]);
 });
 
 test("isCliEntrypoint resolves pnpm-style symlinked argv paths", async () => {

@@ -15,7 +15,7 @@ demo opens Vim and drives it with raw terminal input:
 The terminal workspace uses `new TmpDir({ setup })`, so every preview/restart gets a fresh repository.
 `TmpDir` owns recursive cleanup when the terminal is disposed.
 
-The demo config sets `size: 1280x720`. A future record command can override it with
+The demo config sets `size: 1280x720`. The record command can override it with
 `--size <width>x<height>`.
 
 This folder is a standalone workspace package. It depends on `@akuederle/termdem` as a dev
@@ -26,10 +26,12 @@ Package scripts:
 ```bash
 pnpm run check
 pnpm run previewDemo
+pnpm run createDemo
 ```
 
-Equivalent direct CLI command:
+Equivalent direct CLI commands:
 
 ```bash
 termdem preview ./demo.tsx
+termdem record ./demo.tsx ./git-vim.webm
 ```

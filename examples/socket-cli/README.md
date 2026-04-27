@@ -21,7 +21,7 @@ This is the intended usage pattern for demos where one pane discovers runtime da
 depend on it.
 
 The demo config intentionally separates `size: 1920x1080` from `viewportSize: 1440x900` to document
-the record contract. A future CLI can override both with `--size`, or override just the viewport with
+the record contract. The CLI can override both with `--size`, or override just the viewport with
 `--viewportSize` in addition to `--size`.
 
 This folder is a standalone workspace package. It depends on `@akuederle/termdem` as a dev
@@ -32,10 +32,12 @@ Package scripts:
 ```bash
 pnpm run check
 pnpm run previewDemo
+pnpm run createDemo
 ```
 
-Equivalent direct CLI command:
+Equivalent direct CLI commands:
 
 ```bash
 termdem preview ./demo.tsx
+termdem record ./demo.tsx ./socket-cli.webm
 ```

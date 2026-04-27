@@ -26,7 +26,10 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
   let browser: Browser | null = null;
 
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({
+      executablePath: process.env.TERMDEM_CHROMIUM_EXECUTABLE_PATH,
+      headless: true,
+    });
     const context = await browser.newContext({
       recordVideo: {
         dir: tempDir,

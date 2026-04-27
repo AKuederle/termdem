@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "check": "pnpm --filter @akuederle/termdem build && tsc --noEmit",
-    "previewDemo": "pnpm --filter @akuederle/termdem build && termdem preview ./demo.tsx"
+    "createDemo": "pnpm --filter @akuederle/termdem build && termdem record ./demo.tsx ./socket-cli.webm",
+    "previewDemo": "pnpm --filter @akuederle/termdem build && termdem preview ./demo.tsx",
+    "recordDemo": "pnpm --filter @akuederle/termdem build && termdem record ./demo.tsx ./socket-cli.webm"
   },
   "devDependencies": {
     "@akuederle/termdem": "workspace:*",

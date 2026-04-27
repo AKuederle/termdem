@@ -1,9 +1,18 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { recordBrowserPage } from "./browser-recorder.ts";
 import { inferRecordingFormat, type RecordingFormat } from "./recording-output.ts";
-import { type RecordingCliOptions } from "./recording-config.ts";
-import { runPreviewCommand } from "./preview-server.ts";
+import {
+  resolveRecordingConfig,
+  type RecordingCliOptions,
+  type ResolvedRecordingConfig,
+} from "./recording-config.ts";
+import {
+  runPreviewCommand,
+  startPreviewServer,
+  type TermdemPreviewServer,
+} from "./preview-server.ts";
 
 export type PreviewCommand = {
   command: "preview";
@@ -28,6 +37,20 @@ export type TermdemCliHandlers = {
   preview?: (command: PreviewCommand) => Promise<void> | void;
   record?: (command: RecordCommand) => Promise<void> | void;
   write?: (text: string) => void;
+};
+
+export type RecordCommandDependencies = {
+  recordBrowserPage: (options: {
+    format: RecordingFormat;
+    outputPath: string;
+    size: ResolvedRecordingConfig["size"];
+    url: string;
+    viewportSize: ResolvedRecordingConfig["viewportSize"];
+  }) => Promise<void> | void;
+  startPreviewServer: (options: {
+    demoPath: string;
+    open: boolean;
+  }) => Promise<TermdemPreviewServer>;
 };
 
 export function parseTermdemCliArgs(argv: readonly string[]): TermdemCommand {
@@ -76,8 +99,39 @@ async function defaultPreviewHandler(command: PreviewCommand) {
   });
 }
 
-function defaultRecordHandler(_command: RecordCommand): Promise<void> {
-  throw new Error("The record runtime is not wired into the packaged CLI yet.");
+async function defaultRecordHandler(command: RecordCommand): Promise<void> {
+  await runRecordCommand(command, {
+    recordBrowserPage,
+    startPreviewServer,
+  });
+}
+
+export async function runRecordCommand(
+  command: RecordCommand,
+  dependencies: RecordCommandDependencies,
+): Promise<void> {
+  const previewServer = await dependencies.startPreviewServer({
+    demoPath: command.demoPath,
+    open: false,
+  });
+
+  try {
+    const [url] = previewServer.urls;
+    if (!url) {
+      throw new Error("Preview server did not expose a local URL for recording.");
+    }
+
+    const recordingConfig = resolveRecordingConfig(previewServer.demo.config, command.cliOptions);
+    await dependencies.recordBrowserPage({
+      format: command.format,
+      outputPath: command.outputPath,
+      size: recordingConfig.size,
+      url,
+      viewportSize: recordingConfig.viewportSize,
+    });
+  } finally {
+    await previewServer.close();
+  }
 }
 
 function parsePreviewArgs(args: readonly string[]): PreviewCommand {
