@@ -265,8 +265,8 @@ async function wireSession({
     session = await createPaneSession({
       cwd: workspace.cwd,
       shell,
-      cols: 120,
-      rows: 30,
+      cols: 20,
+      rows: 8,
       prompt,
       onOutput(data) {
         sendPaneMessage(ws, {

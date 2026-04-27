@@ -272,6 +272,9 @@ function PaneTerminalCard({
         ref={ref}
         aria-readonly
         className="pointer-events-none min-h-0 flex-1 select-none overflow-hidden !rounded-none"
+        cols={20}
+        rows={8}
+        style={{ padding: 0 }}
         theme="monokai"
         autoResize
         cursorBlink
