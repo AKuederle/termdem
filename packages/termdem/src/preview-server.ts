@@ -59,6 +59,7 @@ export async function startPreviewServer(
   const reactSsrShimPath = join(root, "react-ssr-shim.mjs");
   const reactJsxDevRuntimeSsrShimPath = join(root, "react-jsx-dev-runtime-ssr-shim.mjs");
   const reactJsxRuntimeSsrShimPath = join(root, "react-jsx-runtime-ssr-shim.mjs");
+  const packageRuntimeDir = dirname(fileURLToPath(import.meta.url));
 
   try {
     await mkdir(dirname(entryPath), { recursive: true });
@@ -77,7 +78,13 @@ export async function startPreviewServer(
       reactRuntimeSsrShimSource("react/jsx-runtime", ["Fragment", "jsx", "jsxs"]),
       "utf8",
     );
-    await writeFile(join(root, "src", "style.css"), previewCss(), "utf8");
+    await writeFile(
+      join(root, "src", "style.css"),
+      previewCss({
+        sourceRoots: [dirname(demoPath), packageRuntimeDir],
+      }),
+      "utf8",
+    );
     await writeFile(entryPath, previewEntrySource(demoPath), "utf8");
 
     const viteServer = await createServer({
@@ -111,7 +118,7 @@ export async function startPreviewServer(
       ],
       server: {
         fs: {
-          allow: [root, dirname(demoPath), process.cwd()],
+          allow: [root, dirname(demoPath), packageRuntimeDir, process.cwd()],
         },
         host: options.host ?? "127.0.0.1",
         open: options.open ?? true,
@@ -503,8 +510,12 @@ function assertViteServer(server: ViteDevServer | null) {
 }
 
 function previewHtml() {
-  return `<html>
+  return `<!doctype html>
+<html>
   <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
     <title>termdem preview</title>
   </head>
   <body>
@@ -515,8 +526,13 @@ function previewHtml() {
 `;
 }
 
-function previewCss() {
+function previewCss({ sourceRoots }: { sourceRoots: string[] }) {
+  const tailwindSources = sourceRoots
+    .map((sourceRoot) => `@source ${JSON.stringify(toVitePath(sourceRoot))};`)
+    .join("\n");
+
   return `@import "tailwindcss";
+${tailwindSources}
 
 html,
 body,

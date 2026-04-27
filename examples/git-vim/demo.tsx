@@ -25,17 +25,23 @@ const demo = createTerminalDemo(
 
     await git.type("vim README.md", { delayMs: 24 });
     await git.press("Enter");
+    await sleep(600);
     await git.type("i# termdem git demo\n\nCreated from raw Vim keystrokes.\n", { delayMs: 18 });
     await git.type(ESC);
+    await sleep(100);
     await git.type(":wq", { delayMs: 28 });
     await git.press("Enter");
+    await sleep(600);
 
     await git.type("vim README.md", { delayMs: 24 });
     await git.press("Enter");
+    await sleep(600);
     await git.type("Go\nEdited in a second Vim session.\n", { delayMs: 18 });
     await git.type(ESC);
+    await sleep(100);
     await git.type(":wq", { delayMs: 28 });
     await git.press("Enter");
+    await sleep(600);
 
     await git.exec("git add README.md", { typeDelayMs: 20 });
     await git.exec("git commit -m 'Create README through vim'", { typeDelayMs: 20 });
@@ -56,4 +62,8 @@ export function render(terminals: TerminalHandles<typeof demo>) {
       </main>
     </Stage>
   );
+}
+
+async function sleep(delayMs: number) {
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
