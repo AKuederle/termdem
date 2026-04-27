@@ -17,10 +17,12 @@
     "ws": "catalog:"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "catalog:",
+    "tailwindcss": "catalog:",
     "typescript": "~6.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:"

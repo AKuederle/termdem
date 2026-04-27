@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { createPaneSession } from "../../packages/termdem/src/index.ts";
 import {
@@ -198,7 +199,7 @@ async function wireSession(ws: WebSocket, paneName: string) {
 }
 
 async function createPaneWorkspace(paneName: string): Promise<PaneWorkspace> {
-  if (paneName !== "main") {
+  if (paneName !== "a") {
     return {
       cwd: repoRoot,
       async dispose() {},
@@ -318,5 +319,5 @@ function isIPv4Loopback(address: string) {
 }
 
 export default defineConfig({
-  plugins: [react(), ptyBridge()],
+  plugins: [tailwindcss(), react(), ptyBridge()],
 });

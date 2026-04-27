@@ -7,6 +7,7 @@ catalog:
   "@types/node": ^24
   "@types/react": ^19.2.14
   "@types/react-dom": ^19.2.3
+  "@tailwindcss/vite": ^4.2.4
   "@vitejs/plugin-react": ^6.0.1
   "@wterm/dom": ^0.1.9
   "@wterm/react": ^0.1.9
@@ -14,6 +15,7 @@ catalog:
   node-pty: ^1.1.0
   react: ^19.2.5
   react-dom: ^19.2.5
+  tailwindcss: ^4.2.4
   typescript: ^5
   vite: npm:@voidzero-dev/vite-plus-core@latest
   vite-plus: latest
