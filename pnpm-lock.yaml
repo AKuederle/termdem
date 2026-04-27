@@ -53,11 +53,10 @@ overrides:
 importers:
 
   .:
-    dependencies:
+    devDependencies:
       agent-browser:
         specifier: 'catalog:'
         version: 0.26.0
-    devDependencies:
       vite-plus:
         specifier: 'catalog:'
         version: 0.1.19(@types/node@25.6.0)(jiti@2.6.1)(typescript@6.0.3)(vite@8.0.9(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))(yaml@2.8.3)
