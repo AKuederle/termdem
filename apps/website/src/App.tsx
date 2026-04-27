@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Terminal, useTerminal } from "@wterm/react";
 import "@wterm/react/css";
 import {
@@ -15,7 +15,6 @@ import type { ExecResult } from "../../../packages/termdem/src/types.ts";
 
 type PaneTheme = "light" | "monokai" | "solarized-dark";
 type PaneStatus = "connecting" | "open" | "closed" | "error";
-type ScriptState = "idle" | "running" | "done" | "error";
 type PaneName = keyof typeof paneSpecs;
 
 type PaneScriptApi = {
@@ -24,7 +23,6 @@ type PaneScriptApi = {
 
 type PaneSpec = {
   title: string;
-  eyebrow: string;
   theme: PaneTheme;
   autoFocus?: boolean;
   script?: (api: PaneScriptApi) => Promise<void>;
@@ -37,8 +35,7 @@ type PendingExec = {
 
 const paneSpecs = {
   a: {
-    title: "a",
-    eyebrow: "script",
+    title: "A",
     theme: "monokai",
     autoFocus: true,
     script: async (api: PaneScriptApi) => {
@@ -52,8 +49,7 @@ const paneSpecs = {
     },
   },
   b: {
-    title: "b",
-    eyebrow: "worker",
+    title: "B",
     theme: "solarized-dark",
     script: async (api: PaneScriptApi) => {
       await api.exec("pwd", { typeDelayMs: 16 });
@@ -61,8 +57,7 @@ const paneSpecs = {
     },
   },
   c: {
-    title: "c",
-    eyebrow: "span",
+    title: "C",
     theme: "monokai",
     script: async (api: PaneScriptApi) => {
       await api.exec("printf 'pane c spans two rows\\n'", { typeDelayMs: 18 });
@@ -92,19 +87,8 @@ function socketUrlForPane(paneName: string) {
 
 function PaneTerminalCard({ pane }: { pane: PaneDefinition }) {
   const spec = getPaneSpec(pane.name);
-  const {
-    connectionKey,
-    exec,
-    focus,
-    meta,
-    reconnect,
-    ref,
-    requestResize,
-    sendInput,
-    status,
-    write,
-  } = usePaneConnection(pane.name);
-  const [scriptState, setScriptState] = useState<ScriptState>("idle");
+  const { connectionKey, exec, focus, meta, ref, requestResize, sendInput, status, write } =
+    usePaneConnection(pane.name);
   const runningScriptKeyRef = useRef<number | null>(null);
 
   const runPaneScript = useEffectEvent(async () => {
@@ -112,19 +96,9 @@ function PaneTerminalCard({ pane }: { pane: PaneDefinition }) {
       return;
     }
 
-    startTransition(() => {
-      setScriptState("running");
-    });
-
     try {
       await spec.script({ exec });
-      startTransition(() => {
-        setScriptState("done");
-      });
     } catch (error) {
-      startTransition(() => {
-        setScriptState("error");
-      });
       write(`\r\n\x1b[31m[script error] ${formatError(error)}\x1b[0m\r\n`);
     }
   });
@@ -145,29 +119,12 @@ function PaneTerminalCard({ pane }: { pane: PaneDefinition }) {
   return (
     <article className={`${paneFrameClassName} ${pane.className ?? ""}`} style={pane.style}>
       <header className="flex h-7 shrink-0 items-center justify-between gap-2 border-b border-[#3a3a3a] bg-[#1b1b1b] px-2 font-mono text-[11px] leading-none">
-        <div className="flex min-w-0 items-center gap-2">
-          <h2 className="m-0 text-[11px] font-semibold text-cyan-300">{spec.title}</h2>
-          <span className="text-slate-500">{spec.eyebrow}</span>
-          <span className={status === "open" ? "text-emerald-300" : "text-amber-200"}>
-            {status}
-          </span>
-          <span className={scriptState === "done" ? "text-emerald-300" : "text-slate-400"}>
-            {scriptState}
-          </span>
-          <span className="min-w-0 truncate text-slate-500">{meta?.cwd ?? "starting"}</span>
-        </div>
-        <button
-          type="button"
-          className="shrink-0 border-l border-[#3a3a3a] pl-2 text-slate-400 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-cyan-300"
-          onClick={reconnect}
-        >
-          rerun
-        </button>
+        <h2 className="m-0 text-[11px] font-semibold text-cyan-300">{spec.title}</h2>
       </header>
 
       <Terminal
         ref={ref}
-        className="min-h-0 flex-1 overflow-hidden"
+        className="min-h-0 flex-1 overflow-hidden !rounded-none"
         theme={spec.theme}
         autoResize
         cursorBlink

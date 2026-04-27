@@ -30,3 +30,14 @@
     font-family: "IBM Plex Mono", monospace;
   }
 }
+
+@layer components {
+  .wterm {
+    border-radius: 0 !important;
+    scrollbar-width: none;
+  }
+
+  .wterm::-webkit-scrollbar {
+    display: none;
+  }
+}
