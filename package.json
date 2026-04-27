@@ -9,6 +9,7 @@
     "prepare": "vp config"
   },
   "devDependencies": {
+    "agent-browser": "catalog:",
     "vite-plus": "catalog:"
   },
   "engines": {
