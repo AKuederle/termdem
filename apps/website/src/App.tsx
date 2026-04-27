@@ -461,7 +461,7 @@ export default function App() {
         }),
       );
     } catch (error) {
-      if (formatError(error) === "Playbook restarted") {
+      if (runId !== playbookRunIdRef.current || formatError(error) === "Playbook restarted") {
         return;
       }
 
