@@ -1,6 +1,7 @@
 import { Pane, Stage, TmpDir, createTerminalDemo, type TerminalHandles } from "@akuederle/termdem";
 
 const ESC = "\x1b";
+const VIM = "vim -Nu NONE -n -i NONE";
 
 const repo = new TmpDir({
   setup: async () => {
@@ -23,7 +24,7 @@ const demo = createTerminalDemo(
       typeDelayMs: 12,
     });
 
-    await git.type("vim README.md", { delayMs: 24 });
+    await git.type(`${VIM} README.md`, { delayMs: 24 });
     await git.press("Enter");
     await sleep(600);
     await git.type("i# termdem git demo\n\nCreated from raw Vim keystrokes.\n", { delayMs: 18 });
@@ -33,7 +34,7 @@ const demo = createTerminalDemo(
     await git.press("Enter");
     await sleep(600);
 
-    await git.type("vim README.md", { delayMs: 24 });
+    await git.type(`${VIM} README.md`, { delayMs: 24 });
     await git.press("Enter");
     await sleep(600);
     await git.type("Go\nEdited in a second Vim session.\n", { delayMs: 18 });
