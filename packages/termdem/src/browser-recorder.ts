@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { chromium, type Page } from "playwright";
+import { chromium, type Browser, type Page } from "playwright";
 import { type DemoSize } from "./recording-config.ts";
 import { inferRecordingFormat, type RecordingFormat } from "./recording-output.ts";
 
@@ -23,9 +23,10 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
   const tempDir = await mkdtemp(join(tmpdir(), "termdem-recording-"));
   const nativeVideoPath =
     format === "webm" ? options.outputPath : join(tempDir, "termdem-recording.webm");
-  const browser = await chromium.launch({ headless: true });
+  let browser: Browser | null = null;
 
   try {
+    browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({
       recordVideo: {
         dir: tempDir,
@@ -49,7 +50,7 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
       await transcodeWebmToMp4(nativeVideoPath, options.outputPath);
     }
   } finally {
-    await browser.close();
+    await browser?.close();
     await rm(tempDir, { recursive: true, force: true });
   }
 }
