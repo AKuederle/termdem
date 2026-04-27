@@ -6,7 +6,10 @@ import {
   createPaneSession,
   createTerminalWorkspace,
   Dir,
+  execNode,
+  ExecNodeError,
   normalizeExecCapture,
+  quoteShellArg,
   TmpDir,
 } from "../src/index.ts";
 
@@ -139,6 +142,53 @@ test("pane sessions can chain exec results from ls into cat", async () => {
   } finally {
     await session.close();
   }
+});
+
+test("quoteShellArg wraps shell arguments and escapes single quotes", () => {
+  expect(quoteShellArg("alpha.txt")).toBe("'alpha.txt'");
+  expect(quoteShellArg("two words")).toBe("'two words'");
+  expect(quoteShellArg("it's.txt")).toBe("'it'\\''s.txt'");
+  expect(quoteShellArg("")).toBe("''");
+});
+
+test("execNode executes a Node script and captures output", async () => {
+  const cwd = await createTempDir();
+  const scriptPath = join(cwd, "echo.mjs");
+  await writeFile(
+    scriptPath,
+    "process.stdout.write(process.argv.slice(2).join('|')); process.stderr.write('warn');\n",
+    "utf8",
+  );
+
+  const result = await execNode(scriptPath, ["alpha", "beta"]);
+
+  expect(result).toEqual({
+    exitCode: 0,
+    stderr: "warn",
+    stdout: "alpha|beta",
+  });
+});
+
+test("execNode rejects by default and can return non-zero results", async () => {
+  const cwd = await createTempDir();
+  const scriptPath = join(cwd, "fail.mjs");
+  await writeFile(
+    scriptPath,
+    "process.stdout.write('before'); process.stderr.write('failed'); process.exit(7);\n",
+    "utf8",
+  );
+
+  await expect(execNode(scriptPath)).rejects.toMatchObject({
+    exitCode: 7,
+    stderr: "failed",
+    stdout: "before",
+  } satisfies Partial<ExecNodeError>);
+
+  await expect(execNode(scriptPath, [], { reject: false })).resolves.toEqual({
+    exitCode: 7,
+    stderr: "failed",
+    stdout: "before",
+  });
 });
 
 test("TmpDir instances can be shared by multiple terminal workspaces", async () => {

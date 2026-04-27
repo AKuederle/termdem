@@ -1,3 +1,10 @@
+export {
+  ExecNodeError,
+  execNode,
+  quoteShellArg,
+  type ExecNodeOptions,
+  type ExecNodeResult,
+} from "./helpers.ts";
 export { normalizeExecCapture } from "./normalize.ts";
 export { createPaneSession, type PaneSession, type PaneSessionOptions } from "./pane-session.ts";
 export {

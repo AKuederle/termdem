@@ -29,6 +29,12 @@ declare module "@akuederle/termdem" {
     type(text: string, options?: { delayMs?: number }): Promise<void>;
   };
 
+  export type ExecNodeResult = {
+    exitCode: number;
+    stderr: string;
+    stdout: string;
+  };
+
   export class Dir {
     constructor(
       setup: () => Promise<string> | string,
@@ -39,6 +45,14 @@ declare module "@akuederle/termdem" {
   export class TmpDir extends Dir {
     constructor(options?: { prefix?: string; setup?: (dir: string) => Promise<void> | void });
   }
+
+  export function execNode(
+    scriptPath: string,
+    args?: readonly string[],
+    options?: { reject?: boolean },
+  ): Promise<ExecNodeResult>;
+
+  export function quoteShellArg(value: string): string;
 
   export function createTerminalDemo<const TTerminals extends readonly TerminalDefinition[]>(
     terminals: TTerminals,

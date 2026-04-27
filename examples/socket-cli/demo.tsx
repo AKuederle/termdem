@@ -1,7 +1,14 @@
 import { cp } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Pane, Stage, TmpDir, createTerminalDemo } from "@akuederle/termdem";
+import {
+  Pane,
+  Stage,
+  TmpDir,
+  createTerminalDemo,
+  execNode,
+  quoteShellArg,
+} from "@akuederle/termdem";
 
 const exampleDir = dirname(fileURLToPath(import.meta.url));
 
@@ -15,7 +22,7 @@ export const { script, terminals } = createTerminalDemo(
   [
     {
       cleanup: async ({ cwd }) => {
-        await execNode(join(cwd, "scripts/server.mjs"), ["cleanup"]);
+        await execNode(join(cwd, "scripts/server.mjs"), ["cleanup"], { reject: false });
       },
       name: "server",
       pwd: workspace,
@@ -76,15 +83,4 @@ function parseChatUrl(output: string) {
   }
 
   return match[1];
-}
-
-function quoteShellArg(value: string) {
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
-
-async function execNode(scriptPath: string, args: string[]) {
-  const { execFile } = await import("node:child_process");
-  await new Promise<void>((resolve) => {
-    execFile(process.execPath, [scriptPath, ...args], () => resolve());
-  });
 }
