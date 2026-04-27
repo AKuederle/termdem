@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { createTerminalDemo, TmpDir } from "../src/index.ts";
 
-test("createTerminalDemo creates named terminal handles and preserves config", () => {
+test("createTerminalDemo preserves backend terminal definitions and config", () => {
   const dir = new TmpDir();
   const script = () => {};
 
@@ -23,10 +23,7 @@ test("createTerminalDemo creates named terminal handles and preserves config", (
     },
   );
 
-  expect(demo.terminals).toEqual({
-    client: { name: "client" },
-    server: { name: "server" },
-  });
+  expect(demo.terminalDefinitions.map((terminal) => terminal.name)).toEqual(["server", "client"]);
   expect(demo.script).toBe(script);
   expect(demo.config).toEqual({
     size: { width: 1920, height: 1080 },

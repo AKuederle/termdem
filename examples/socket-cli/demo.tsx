@@ -1,8 +1,16 @@
-import { Dir, Pane, Stage, createTerminalDemo, execNode, quoteShellArg } from "@akuederle/termdem";
+import {
+  Dir,
+  Pane,
+  Stage,
+  createTerminalDemo,
+  execNode,
+  quoteShellArg,
+  type TerminalHandles,
+} from "@akuederle/termdem";
 
 const workspace = new Dir(() => decodeURIComponent(new URL(".", import.meta.url).pathname));
 
-export const { script, terminals } = createTerminalDemo(
+const demo = createTerminalDemo(
   [
     {
       cleanup: async ({ cwd }) => {
@@ -49,7 +57,9 @@ export const { script, terminals } = createTerminalDemo(
   },
 );
 
-export function render() {
+export default demo;
+
+export function render(terminals: TerminalHandles<typeof demo>) {
   return (
     <Stage>
       <main className="grid h-dvh min-h-0 grid-cols-1 grid-rows-3 gap-px bg-[#333] p-px lg:grid-cols-[1fr_1.1fr] lg:grid-rows-2">

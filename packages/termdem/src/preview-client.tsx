@@ -9,9 +9,9 @@ import type { ExecResult, PaneController, PressKey, TypeOptions } from "./types.
 type PreviewMode = "running" | "stopped";
 
 type PreviewDemoModule = {
-  render?: (terminals: Record<string, { name: string }>) => ReactNode;
+  render: (terminals: Record<string, { name: string }>) => ReactNode;
   script?: (api: { pane(name: string): PaneController }) => Promise<void> | void;
-  terminals?: Record<string, { name: string }>;
+  terminals: Record<string, { name: string }>;
 };
 
 type PaneRuntime = PaneController & {
@@ -235,7 +235,7 @@ function PaneTerminalCard({
       type,
       write,
     });
-  }, [connectionKey, exec, onRuntimeChange, pane.name, press, status, type, write]);
+  }, [connectionKey, pane.name, status]);
 
   return (
     <article className={`${paneFrameClassName} ${pane.className ?? ""}`} style={pane.style}>
@@ -418,7 +418,7 @@ function usePaneConnection(paneName: string) {
       rejectPendingWork(new Error(`Pane ${paneName} disconnected`));
       socket.close();
     };
-  }, [connectionKey, handleServerMessage, paneName, rejectPendingWork]);
+  }, [paneName]);
 
   return {
     connectionKey,
@@ -466,11 +466,7 @@ function createPlaybookApi(
 }
 
 function createDemoScene(demo: PreviewDemoModule) {
-  if (!demo.render) {
-    throw new Error("Demo module must export render(terminals)");
-  }
-
-  return demo.render(demo.terminals ?? {});
+  return demo.render(demo.terminals);
 }
 
 function socketUrlForPane(paneName: string) {

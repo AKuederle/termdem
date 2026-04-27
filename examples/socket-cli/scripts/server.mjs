@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
@@ -8,7 +9,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptPath = fileURLToPath(import.meta.url);
-const statePath = join(tmpdir(), "termdem-socket-cli-server-state.json");
+const stateId = createHash("sha256").update(scriptPath).digest("hex").slice(0, 16);
+const statePath = join(tmpdir(), `termdem-socket-cli-server-${stateId}.json`);
 const command = process.argv[2];
 
 switch (command) {

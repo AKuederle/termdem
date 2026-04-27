@@ -1,4 +1,4 @@
-import { Pane, Stage, TmpDir, createTerminalDemo } from "@akuederle/termdem";
+import { Pane, Stage, TmpDir, createTerminalDemo, type TerminalHandles } from "@akuederle/termdem";
 
 const ESC = "\x1b";
 
@@ -8,7 +8,7 @@ const repo = new TmpDir({
   },
 });
 
-export const { script, terminals } = createTerminalDemo(
+const demo = createTerminalDemo(
   [
     {
       name: "git",
@@ -46,7 +46,9 @@ export const { script, terminals } = createTerminalDemo(
   },
 );
 
-export function render() {
+export default demo;
+
+export function render(terminals: TerminalHandles<typeof demo>) {
   return (
     <Stage>
       <main className="grid h-dvh bg-[#111] p-1">

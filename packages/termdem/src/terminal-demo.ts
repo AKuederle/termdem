@@ -8,6 +8,11 @@ export type TerminalHandle<Name extends string = string> = {
   name: Name;
 };
 
+export type TerminalHandles<TDemo extends TerminalDemo<readonly TerminalDefinition[]>> =
+  TDemo extends TerminalDemo<infer TTerminals>
+    ? Record<TTerminals[number]["name"], TerminalHandle<TTerminals[number]["name"]>>
+    : never;
+
 export type TerminalDemoScriptApi<Name extends string> = {
   pane(name: Name): PaneController;
 };
@@ -19,7 +24,6 @@ export type TerminalDemo<
   config: RecordingConfig;
   script: (api: TerminalDemoScriptApi<TName>) => Promise<void> | void;
   terminalDefinitions: TTerminals;
-  terminals: Record<TName, TerminalHandle<TName>>;
 };
 
 export function createTerminalDemo<const TTerminals extends readonly TerminalDefinition[]>(
@@ -31,8 +35,5 @@ export function createTerminalDemo<const TTerminals extends readonly TerminalDef
     config,
     script,
     terminalDefinitions,
-    terminals: Object.fromEntries(
-      terminalDefinitions.map((terminal) => [terminal.name, { name: terminal.name }]),
-    ) as TerminalDemo<TTerminals>["terminals"],
   };
 }

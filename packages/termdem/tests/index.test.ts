@@ -2,17 +2,11 @@ import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
-import {
-  createPaneSession,
-  createTerminalWorkspace,
-  Dir,
-  execNode,
-  ExecNodeError,
-  normalizeExecCapture,
-  quoteShellArg,
-  resolveRecordingConfig,
-  TmpDir,
-} from "../src/index.ts";
+import { Dir, execNode, ExecNodeError, quoteShellArg, TmpDir } from "../src/index.ts";
+import { normalizeExecCapture } from "../src/normalize.ts";
+import { createPaneSession } from "../src/pane-session.ts";
+import { resolveRecordingConfig } from "../src/recording-config.ts";
+import { createTerminalWorkspace } from "../src/workspace.ts";
 
 const cleanupPaths: string[] = [];
 

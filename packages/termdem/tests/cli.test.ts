@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, test } from "vite-plus/test";
 import { isCliEntrypoint, parseTermdemCliArgs, runTermdemCli } from "../src/cli.ts";
-import { inferRecordingFormat } from "../src/index.ts";
+import { inferRecordingFormat } from "../src/recording-output.ts";
 
 test("parseTermdemCliArgs parses preview commands", () => {
   expect(parseTermdemCliArgs(["preview", "demo.tsx"])).toEqual({

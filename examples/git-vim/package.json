@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "check": "pnpm --filter @akuederle/termdem build && tsc --noEmit",
-    "previewDemo": "termdem preview ./demo.tsx"
+    "previewDemo": "pnpm --filter @akuederle/termdem build && termdem preview ./demo.tsx"
   },
   "devDependencies": {
     "@akuederle/termdem": "workspace:*",

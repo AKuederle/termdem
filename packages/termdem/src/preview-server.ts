@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +26,7 @@ export type PreviewServerOptions = {
 
 export type TermdemPreviewServer = {
   close(): Promise<void>;
+  demo: PreviewDemoModule;
   urls: string[];
 };
 
@@ -55,12 +56,28 @@ export async function startPreviewServer(
   const root = await mkdtemp(join(tmpdir(), "termdem-preview-"));
   const clientShimPath = join(root, "termdem-client-shim.js");
   const entryPath = join(root, "src", "main.tsx");
+  const reactSsrShimPath = join(root, "react-ssr-shim.mjs");
+  const reactJsxDevRuntimeSsrShimPath = join(root, "react-jsx-dev-runtime-ssr-shim.mjs");
+  const reactJsxRuntimeSsrShimPath = join(root, "react-jsx-runtime-ssr-shim.mjs");
 
   try {
     await mkdir(dirname(entryPath), { recursive: true });
+    await linkBrowserDependency(root, "react");
+    await linkBrowserDependency(root, "react-dom");
     await writeFile(join(root, "index.html"), previewHtml(), "utf8");
     await writeFile(clientShimPath, clientShimSource(), "utf8");
-    await writeFile(join(root, "src", "style.css"), '@import "tailwindcss";\n', "utf8");
+    await writeFile(reactSsrShimPath, reactSsrShimSource(), "utf8");
+    await writeFile(
+      reactJsxDevRuntimeSsrShimPath,
+      reactRuntimeSsrShimSource("react/jsx-dev-runtime", ["jsxDEV"]),
+      "utf8",
+    );
+    await writeFile(
+      reactJsxRuntimeSsrShimPath,
+      reactRuntimeSsrShimSource("react/jsx-runtime", ["Fragment", "jsx", "jsxs"]),
+      "utf8",
+    );
+    await writeFile(join(root, "src", "style.css"), previewCss(), "utf8");
     await writeFile(entryPath, previewEntrySource(demoPath), "utf8");
 
     const viteServer = await createServer({
@@ -71,15 +88,19 @@ export async function startPreviewServer(
       },
       logLevel: "silent",
       optimizeDeps: {
-        entries: [],
-        noDiscovery: true,
+        include: ["react", "react-dom/client"],
       },
       resolve: {
         alias: runtimeDependencyAliases(),
       },
       root,
       plugins: [
-        termdemClientShim(clientShimPath),
+        termdemClientShim({
+          clientShimPath,
+          reactJsxDevRuntimeSsrShimPath,
+          reactJsxRuntimeSsrShimPath,
+          reactSsrShimPath,
+        }),
         tailwindcss(),
         react(),
         ptyBridge({
@@ -99,10 +120,12 @@ export async function startPreviewServer(
       },
     });
 
+    const demo = await loadDemoModule(viteServer, demoPath);
     await viteServer.listen();
     printPreviewUrls(viteServer);
 
     return {
+      demo,
       urls: viteServer.resolvedUrls?.local ?? [],
       async close() {
         try {
@@ -337,11 +360,20 @@ async function createPaneWorkspace(
 
 async function loadDemoModule(viteServer: ViteDevServer, demoPath: string) {
   const demoModule = (await viteServer.ssrLoadModule(`/@fs/${toVitePath(demoPath)}`)) as unknown;
-  if (!isPreviewDemoModule(demoModule)) {
-    throw new Error("Demo module must export terminalDefinitions via createTerminalDemo");
+  const demo = readDefaultPreviewDemo(demoModule);
+  if (!isPreviewDemoModule(demo)) {
+    throw new Error("Demo module must default-export the createTerminalDemo result");
   }
 
-  return demoModule;
+  return demo;
+}
+
+function readDefaultPreviewDemo(value: unknown): unknown {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+
+  return (value as { default?: unknown }).default;
 }
 
 function isPreviewDemoModule(value: unknown): value is PreviewDemoModule {
@@ -370,7 +402,7 @@ function sendPaneMessage(ws: WebSocket, message: PaneServerMessage) {
 
 function formatError(error: unknown) {
   if (error instanceof Error) {
-    return error.message;
+    return error.stack ?? error.message;
   }
 
   return String(error);
@@ -481,12 +513,38 @@ function previewHtml() {
 `;
 }
 
+function previewCss() {
+  return `@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  min-height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: #111;
+}
+
+* {
+  box-sizing: border-box;
+}
+`;
+}
+
 function previewEntrySource(demoPath: string) {
   return `import "./style.css";
-import * as demo from ${JSON.stringify(`/@fs/${toVitePath(demoPath)}`)};
+import demo, { render } from ${JSON.stringify(`/@fs/${toVitePath(demoPath)}`)};
 import { renderPreviewApp } from "@akuederle/termdem/preview-client";
 
-renderPreviewApp(demo);
+const terminals = Object.fromEntries(
+  demo.terminalDefinitions.map((terminal) => [terminal.name, { name: terminal.name }]),
+);
+
+renderPreviewApp({ render, script: demo.script, terminals });
 `;
 }
 
@@ -508,9 +566,6 @@ export function createTerminalDemo(terminalDefinitions, script, config = {}) {
     config,
     script,
     terminalDefinitions,
-    terminals: Object.fromEntries(
-      terminalDefinitions.map((terminal) => [terminal.name, { name: terminal.name }]),
-    ),
   };
 }
 
@@ -524,19 +579,67 @@ export async function execNode() {
 `;
 }
 
+function reactSsrShimSource() {
+  return `import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const React = require(${JSON.stringify(fileURLToPath(import.meta.resolve("react")))});
+
+export const Children = React.Children;
+export const cloneElement = React.cloneElement;
+export const Fragment = React.Fragment;
+export const isValidElement = React.isValidElement;
+export const Profiler = React.Profiler;
+export const StrictMode = React.StrictMode;
+export default React;
+`;
+}
+
+function reactRuntimeSsrShimSource(specifier: string, exportNames: string[]) {
+  const declarations = exportNames
+    .map((name) => `export const ${name} = runtime.${name};`)
+    .join("\n");
+
+  return `import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const runtime = require(${JSON.stringify(fileURLToPath(import.meta.resolve(specifier)))});
+
+${declarations}
+export default runtime;
+`;
+}
+
 function toVitePath(path: string) {
   return path.replaceAll("\\", "/");
 }
 
-function termdemClientShim(clientShimPath: string): Plugin {
+function termdemClientShim({
+  clientShimPath,
+  reactJsxDevRuntimeSsrShimPath,
+  reactJsxRuntimeSsrShimPath,
+  reactSsrShimPath,
+}: {
+  clientShimPath: string;
+  reactJsxDevRuntimeSsrShimPath: string;
+  reactJsxRuntimeSsrShimPath: string;
+  reactSsrShimPath: string;
+}): Plugin {
+  const ssrOnlyAliases = new Map([
+    ["react", reactSsrShimPath],
+    ["react/jsx-dev-runtime", reactJsxDevRuntimeSsrShimPath],
+    ["react/jsx-runtime", reactJsxRuntimeSsrShimPath],
+  ]);
+
   return {
+    enforce: "pre",
     name: "termdem-client-shim",
     resolveId(id, _importer, options) {
-      if (id === "@akuederle/termdem" && !options.ssr) {
+      if (id === "@akuederle/termdem" && options.ssr !== true) {
         return clientShimPath;
       }
 
-      return null;
+      return options.ssr === true ? ssrOnlyAliases.get(id) : undefined;
     },
   };
 }
@@ -547,12 +650,14 @@ function runtimeDependencyAliases(): Alias[] {
     exactAlias("@akuederle/termdem/scene"),
     exactAlias("@wterm/react"),
     exactAlias("@wterm/react/css"),
-    exactAlias("react"),
-    exactAlias("react-dom"),
-    exactAlias("react-dom/client"),
-    exactAlias("react/jsx-dev-runtime"),
-    exactAlias("react/jsx-runtime"),
   ];
+}
+
+async function linkBrowserDependency(root: string, specifier: string) {
+  const dependencyPath = dirname(fileURLToPath(import.meta.resolve(`${specifier}/package.json`)));
+  const targetPath = join(root, "node_modules", ...specifier.split("/"));
+  await mkdir(dirname(targetPath), { recursive: true });
+  await symlink(dependencyPath, targetPath, "dir");
 }
 
 function exactAlias(specifier: string): Alias {
