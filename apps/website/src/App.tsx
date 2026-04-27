@@ -24,7 +24,6 @@ type PaneScriptApi = {
 type PaneSpec = {
   title: string;
   theme: PaneTheme;
-  autoFocus?: boolean;
   script?: (api: PaneScriptApi) => Promise<void>;
 };
 
@@ -37,7 +36,6 @@ const paneSpecs = {
   a: {
     title: "A",
     theme: "monokai",
-    autoFocus: true,
     script: async (api: PaneScriptApi) => {
       const listing = await api.exec("command ls -1 --color=never", { typeDelayMs: 38 });
       const firstFile = listing.lines[0];
@@ -79,6 +77,8 @@ const demoScene = (
 const paneFrameClassName =
   "flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#101010] text-slate-100";
 
+const ignoreTerminalInput = () => {};
+
 function socketUrlForPane(paneName: string) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const bridgeToken = getBridgeToken();
@@ -87,8 +87,9 @@ function socketUrlForPane(paneName: string) {
 
 function PaneTerminalCard({ pane }: { pane: PaneDefinition }) {
   const spec = getPaneSpec(pane.name);
-  const { connectionKey, exec, focus, meta, ref, requestResize, sendInput, status, write } =
-    usePaneConnection(pane.name);
+  const { connectionKey, exec, meta, ref, requestResize, status, write } = usePaneConnection(
+    pane.name,
+  );
   const runningScriptKeyRef = useRef<number | null>(null);
 
   const runPaneScript = useEffectEvent(async () => {
@@ -124,17 +125,14 @@ function PaneTerminalCard({ pane }: { pane: PaneDefinition }) {
 
       <Terminal
         ref={ref}
-        className="min-h-0 flex-1 overflow-hidden !rounded-none"
+        aria-readonly
+        className="pointer-events-none min-h-0 flex-1 select-none overflow-hidden !rounded-none"
         theme={spec.theme}
         autoResize
         cursorBlink
-        onReady={() => {
-          if (spec.autoFocus) {
-            focus();
-          }
-        }}
-        onData={sendInput}
+        onData={ignoreTerminalInput}
         onResize={requestResize}
+        tabIndex={-1}
       />
     </article>
   );
@@ -143,7 +141,7 @@ function PaneTerminalCard({ pane }: { pane: PaneDefinition }) {
 function usePaneConnection(paneName: string) {
   const socketRef = useRef<WebSocket | null>(null);
   const pendingExecsRef = useRef<PendingExec[]>([]);
-  const { focus, ref, write } = useTerminal();
+  const { ref, write } = useTerminal();
   const [connectionKey, setConnectionKey] = useState(0);
   const [meta, setMeta] = useState<{ cwd: string; prompt: string; shell: string } | null>(null);
   const [status, setStatus] = useState<PaneStatus>("connecting");
@@ -189,16 +187,6 @@ function usePaneConnection(paneName: string) {
         pane: paneName,
         cols,
         rows,
-      });
-    } catch {}
-  });
-
-  const sendInput = useEffectEvent((data: string) => {
-    try {
-      sendMessage({
-        type: "pane.input",
-        pane: paneName,
-        data,
       });
     } catch {}
   });
@@ -285,12 +273,10 @@ function usePaneConnection(paneName: string) {
   return {
     connectionKey,
     exec,
-    focus,
     meta,
     reconnect,
     ref,
     requestResize,
-    sendInput,
     status,
     write,
   };
