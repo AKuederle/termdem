@@ -55,6 +55,7 @@ jobs:
         run: vp run test:smoke
 
       - name: Publish package
-        run: pnpm -C packages/termdem publish --access public --provenance --no-git-checks
+        working-directory: packages/termdem
+        run: pnpm publish --access public --provenance --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
