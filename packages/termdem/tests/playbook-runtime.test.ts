@@ -218,6 +218,28 @@ test("playbook runtime runs hidden lifecycle hooks around the visible script", a
   expect(teardownData).toEqual(["hidden setup output"]);
 });
 
+test("playbook runtime persists exported setup env in the visible script", async () => {
+  const runtime = new PlaybookRuntime({
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
+    typeDelayMs: 0,
+  });
+  let visibleEnv = "";
+
+  await runtime.run(
+    async (api) => {
+      const result = await api.pane("main").exec("printf '%s' \"$TERMDEM_SETUP_ENV\"");
+      visibleEnv = result.text;
+    },
+    {
+      setup: async (api) => {
+        await api.pane("main").exec("export TERMDEM_SETUP_ENV=from-setup");
+      },
+    },
+  );
+
+  expect(visibleEnv).toBe("from-setup");
+});
+
 test("playbook runtime cancellation prevents stale playbook completion", async () => {
   const states: string[] = [];
   const runtime = new PlaybookRuntime({

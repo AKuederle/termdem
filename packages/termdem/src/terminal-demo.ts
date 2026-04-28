@@ -219,7 +219,9 @@ export type CreateTerminalDemoOptions<
    * Hidden setup callback run before the visible demo script.
    *
    * It receives the same API as the script, but pane commands run without frontend output
-   * and default to instant execution. Its return value is passed to the script.
+   * and default to instant execution. Pane commands run in the same shell session used by the
+   * visible script, so shell state such as exported environment variables persists. Its return
+   * value is passed to the script.
    */
   setup?: TerminalDemoSetup<TTerminals[number]["name"], SetupData>;
   /**
