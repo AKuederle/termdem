@@ -5,7 +5,7 @@ import { afterEach, expect, test } from "vite-plus/test";
 import { keys } from "../src/keys.ts";
 import { PlaybookRuntime } from "../src/playbook-runtime.ts";
 import { createPaneSession } from "../src/pane-session.ts";
-import type { NodeExecResult } from "../src/types.ts";
+import type { NodeExecResult, PaneScreenSnapshot } from "../src/types.ts";
 import { TmpDir } from "../src/workspace.ts";
 
 const cleanupPaths: string[] = [];
@@ -122,6 +122,35 @@ test("playbook runtime exposes pane cwd after visible commands change it", async
 
     expect(await pane.cwd()).toBe(join(initialCwd, "nested"));
   });
+});
+
+test("playbook runtime exposes current pane screen snapshots to scripts", async () => {
+  const snapshot: PaneScreenSnapshot = {
+    altScreen: false,
+    cols: 80,
+    cursor: { col: 5, row: 1, visible: true },
+    lines: ["dev server", "ready"],
+    rows: 24,
+    scrollbackCount: 0,
+    text: "dev server\nready",
+  };
+  const screenRequests: string[] = [];
+  const runtime = new PlaybookRuntime({
+    readPaneScreen: async (pane) => {
+      screenRequests.push(pane);
+      return snapshot;
+    },
+    terminalDefinitions: [{ name: "server", pwd: new TmpDir({}) }],
+    typeDelayMs: 0,
+  });
+  let actual: PaneScreenSnapshot | undefined;
+
+  await runtime.run(async (api) => {
+    actual = await api.pane("server").screen();
+  });
+
+  expect(screenRequests).toEqual(["server"]);
+  expect(actual).toEqual(snapshot);
 });
 
 test("playbook runtime runs hidden lifecycle hooks around the visible script", async () => {

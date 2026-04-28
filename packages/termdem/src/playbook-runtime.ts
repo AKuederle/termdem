@@ -14,6 +14,7 @@ import type {
   NodeExecOptions,
   NodeExecResult,
   PaneController,
+  PaneScreenSnapshot,
   PressKey,
   TypeOptions,
   WaitForOptions,
@@ -49,6 +50,7 @@ export type PlaybookRuntimeOptions = {
   onPaneStatus?: (status: PaneRuntimeStatus) => void;
   onPlaybookState?: (state: PlaybookState) => void;
   onRecordingState?: (state: RecordingState) => void;
+  readPaneScreen?: (pane: string) => Promise<PaneScreenSnapshot>;
   shell?: string;
   terminalDefinitions: readonly TerminalWorkspaceDefinition[];
   typeDelayMs?: number;
@@ -322,6 +324,14 @@ export class PlaybookRuntime<Name extends string = string> {
       cwd: async (): Promise<string> => {
         await this.ensureActive(generation, actionName("cwd"));
         return this.readyPane(name).cwd();
+      },
+      screen: async (): Promise<PaneScreenSnapshot> => {
+        await this.ensureActive(generation, actionName("screen"));
+        if (!this.options.readPaneScreen) {
+          throw new Error("Pane screen reads require a preview client");
+        }
+
+        return this.options.readPaneScreen(name);
       },
       exec: async (command: string, options?: ExecOptions): Promise<ExecResult> => {
         await this.ensureActive(generation, actionName("exec"));

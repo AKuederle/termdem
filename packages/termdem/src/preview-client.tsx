@@ -66,6 +66,7 @@ export function nextPreviewClientState(
       };
     case "pane.meta":
     case "pane.output":
+    case "pane.screen.request":
     case "pane.status":
     case "recording.state":
     case "preview.error":
@@ -300,6 +301,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
       switch (message.type) {
         case "pane.output":
         case "pane.meta":
+        case "pane.screen.request":
         case "pane.status": {
           const listeners = listenersRef.current.get(message.pane);
           for (const listener of listeners ?? []) {

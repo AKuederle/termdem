@@ -344,6 +344,8 @@ async function handleBrowserMessage({
     case "pane.resize":
       await runtime.resizePane(parsed.pane, parsed.cols, parsed.rows);
       return;
+    case "pane.screen.response":
+      return;
     case "playbook.start":
       if (demo.script) {
         await runtime.run(demo.script, { setup: demo.setup, teardown: demo.teardown });
@@ -422,6 +424,7 @@ function rememberLatestMessage(
       latestMessages.set(message.type, message);
       return;
     case "pane.output":
+    case "pane.screen.request":
     case "preview.error":
     case "preview.reset":
       return;

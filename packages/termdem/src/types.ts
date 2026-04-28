@@ -1,4 +1,7 @@
 import type { KeySequence } from "./keys.ts";
+import type { PaneScreenSnapshot } from "./protocol.ts";
+
+export type { PaneScreenSnapshot } from "./protocol.ts";
 
 /**
  * Keys accepted by `pane.press()`.
@@ -82,6 +85,15 @@ export interface PaneController {
    * ```
    */
   cwd(): Promise<string>;
+
+  /**
+   * Reads the terminal pane's current rendered screen.
+   *
+   * The snapshot reflects the terminal emulator buffer, so redraw-based programs such as
+   * `watch`, dev servers with progress output, and full-screen terminal apps can be
+   * inspected without waiting for a shell prompt.
+   */
+  screen(): Promise<PaneScreenSnapshot>;
 
   /**
    * Types raw text into the terminal as visible keyboard input.

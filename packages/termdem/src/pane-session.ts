@@ -165,6 +165,12 @@ class NodePtyPaneSession implements PaneSession {
     return this.enqueue(async () => this.currentCwd);
   }
 
+  async screen() {
+    return this.enqueue(async () => {
+      throw new Error("Pane screen reads require a preview client");
+    });
+  }
+
   async type(text: string, options: PaneSessionTypeOptions = {}) {
     await this.enqueue(() => this.performType(text, options));
   }
