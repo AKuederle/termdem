@@ -20,7 +20,7 @@ catalog:
   react-dom: ^19.2.5
   tailwindcss: ^4.2.4
   typescript: ^5
-  vite: npm:@voidzero-dev/vite-plus-core@latest
+  vite: ^8.0.9
   vite-plus: latest
   vitest: npm:@voidzero-dev/vite-plus-test@latest
   ws: ^8.20.0
@@ -30,13 +30,3 @@ catalogMode: prefer
 onlyBuiltDependencies:
   - agent-browser
   - node-pty
-overrides:
-  vite: "catalog:"
-  vitest: "catalog:"
-peerDependencyRules:
-  allowAny:
-    - vite
-    - vitest
-  allowedVersions:
-    vite: "*"
-    vitest: "*"
