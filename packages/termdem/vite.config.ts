@@ -20,4 +20,7 @@ export default defineConfig({
     },
   },
   fmt: {},
+  test: {
+    tags: [{ name: "smoke" }],
+  },
 });

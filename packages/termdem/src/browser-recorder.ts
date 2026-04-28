@@ -253,7 +253,9 @@ declare global {
   var __termdem:
     | {
         controls?: {
+          restart?: () => void;
           start?: () => void;
+          stop?: () => void;
         };
         recording?: {
           action?: string;

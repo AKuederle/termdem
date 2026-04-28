@@ -22,6 +22,7 @@ export type TerminalWorkspaceDefinition = {
   cleanup?: (context: TerminalCleanupContext) => Awaitable<void>;
   name: string;
   pwd: Dir;
+  setupCommand?: string;
 };
 
 export type TerminalWorkspace = {

@@ -1,6 +1,11 @@
 import type { CSSProperties, ReactElement } from "react";
 import { type RecordingConfig } from "./recording-config.ts";
-import { type PaneController } from "./types.ts";
+import {
+  type NodeExecOptions,
+  type NodeExecResult,
+  type PaneController,
+  type WaitForOptions,
+} from "./types.ts";
 import { type TerminalWorkspaceDefinition } from "./workspace.ts";
 
 export type TerminalDefinition = TerminalWorkspaceDefinition;
@@ -18,8 +23,16 @@ export type TerminalPaneComponents<TDemo extends TerminalDemo<readonly TerminalD
     : never;
 
 export type TerminalDemoScriptApi<Name extends string> = {
+  node: {
+    execFile(
+      file: string,
+      args?: readonly string[],
+      options?: NodeExecOptions,
+    ): Promise<NodeExecResult>;
+  };
   pane(name: Name): PaneController;
   wait(delayMs: number): Promise<void>;
+  waitFor(label: string, probe: () => Promise<boolean>, options?: WaitForOptions): Promise<void>;
 };
 
 export type TerminalDemo<

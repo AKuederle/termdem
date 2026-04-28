@@ -6,6 +6,9 @@ export default defineConfig({
   },
   fmt: {},
   lint: { options: { typeAware: true, typeCheck: true } },
+  test: {
+    tags: [{ name: "smoke" }],
+  },
   run: {
     cache: true,
   },

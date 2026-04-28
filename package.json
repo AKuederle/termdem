@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "ready": "vp check && vp run -r test && vp run -r build",
+    "test:smoke": "vp test run packages/termdem/tests/examples.smoke.test.ts --tagsFilter smoke",
     "dev": "vp run @akuederle/termdem#dev",
     "prepare": "vp config"
   },

@@ -1,48 +1,28 @@
-import type { ExecResult, PressKey } from "./types.ts";
+import type { ExecResult } from "./types.ts";
 
 export type PaneInputMessage = {
   type: "pane.input";
-  id?: string;
   pane: string;
   data: string;
 };
 
 export type PaneResizeMessage = {
   type: "pane.resize";
-  id?: string;
   pane: string;
   cols: number;
   rows: number;
 };
 
-export type PaneTypeMessage = {
-  type: "pane.type";
-  id?: string;
-  pane: string;
-  text: string;
-  typeDelayMs?: number;
+export type PlaybookControlMessage = {
+  type:
+    | "playbook.start"
+    | "playbook.pause"
+    | "playbook.resume"
+    | "playbook.restart"
+    | "playbook.stop";
 };
 
-export type PanePressMessage = {
-  type: "pane.press";
-  id?: string;
-  pane: string;
-  key: PressKey;
-};
-
-export type PaneExecMessage = {
-  type: "pane.exec";
-  pane: string;
-  command: string;
-  typeDelayMs?: number;
-};
-
-export type PaneClientMessage =
-  | PaneInputMessage
-  | PaneResizeMessage
-  | PaneTypeMessage
-  | PanePressMessage
-  | PaneExecMessage;
+export type BrowserToServerMessage = PaneInputMessage | PaneResizeMessage | PlaybookControlMessage;
 
 export type PaneMetaMessage = {
   type: "pane.meta";
@@ -58,126 +38,90 @@ export type PaneOutputMessage = {
   data: string;
 };
 
-export type PaneExecCompletedMessage = {
-  type: "pane.exec.completed";
+export type PaneStatusMessage = {
+  type: "pane.status";
   pane: string;
-  result: ExecResult;
+  status: "ready" | "closed" | "error";
+  message?: string;
 };
 
-export type PaneActionCompletedMessage = {
-  type: "pane.action.completed";
-  pane: string;
-  id: string;
+export type PlaybookStateMessage = {
+  type: "playbook.state";
+  state: "idle" | "running" | "stopped" | "done" | "error";
+  action?: string;
+  error?: string;
 };
 
-export type PaneExitMessage = {
-  type: "pane.exit";
-  pane: string;
-  exitCode: number | null;
-  signal: number | null;
+export type RecordingStateMessage = {
+  type: "recording.state";
+  state: "ready" | "started" | "done" | "error";
+  action?: string;
+  error?: string;
 };
 
-export type PaneErrorMessage = {
-  type: "pane.error";
-  pane: string;
+export type PreviewErrorMessage = {
+  type: "preview.error";
   message: string;
 };
 
-export type PaneServerMessage =
+export type ServerToBrowserMessage =
   | PaneMetaMessage
   | PaneOutputMessage
-  | PaneActionCompletedMessage
-  | PaneExecCompletedMessage
-  | PaneExitMessage
-  | PaneErrorMessage;
+  | PaneStatusMessage
+  | PlaybookStateMessage
+  | RecordingStateMessage
+  | PreviewErrorMessage;
 
-export function parsePaneClientMessage(raw: string): PaneClientMessage | null {
+export type PaneClientMessage = BrowserToServerMessage;
+export type PaneServerMessage = ServerToBrowserMessage;
+
+export function parseBrowserToServerMessage(raw: string): BrowserToServerMessage | null {
   const payload = parseObject(raw);
-  if (!payload) {
-    return null;
-  }
-
-  if (!isPaneName(payload.pane) || typeof payload.type !== "string") {
+  if (!payload || typeof payload.type !== "string") {
     return null;
   }
 
   switch (payload.type) {
     case "pane.input":
-      if (typeof payload.data !== "string") {
+      if (!isPaneName(payload.pane) || typeof payload.data !== "string") {
         return null;
       }
-      return {
-        type: "pane.input",
-        id: optionalString(payload.id),
-        pane: payload.pane,
-        data: payload.data,
-      };
+      return { type: "pane.input", pane: payload.pane, data: payload.data };
     case "pane.resize":
-      if (typeof payload.cols !== "number" || typeof payload.rows !== "number") {
+      if (
+        !isPaneName(payload.pane) ||
+        !isPositiveInteger(payload.cols) ||
+        !isPositiveInteger(payload.rows)
+      ) {
         return null;
       }
       return {
         type: "pane.resize",
-        id: optionalString(payload.id),
         pane: payload.pane,
         cols: payload.cols,
         rows: payload.rows,
       };
-    case "pane.type":
-      if (typeof payload.text !== "string") {
-        return null;
-      }
-      if (payload.typeDelayMs !== undefined && typeof payload.typeDelayMs !== "number") {
-        return null;
-      }
-      return {
-        type: "pane.type",
-        id: optionalString(payload.id),
-        pane: payload.pane,
-        text: payload.text,
-        typeDelayMs: payload.typeDelayMs,
-      };
-    case "pane.press":
-      if (payload.key !== "Enter" && payload.key !== "\r") {
-        return null;
-      }
-      return {
-        type: "pane.press",
-        id: optionalString(payload.id),
-        pane: payload.pane,
-        key: payload.key,
-      };
-    case "pane.exec":
-      if (typeof payload.command !== "string") {
-        return null;
-      }
-      if (payload.typeDelayMs !== undefined && typeof payload.typeDelayMs !== "number") {
-        return null;
-      }
-      return {
-        type: "pane.exec",
-        pane: payload.pane,
-        command: payload.command,
-        typeDelayMs: payload.typeDelayMs,
-      };
+    case "playbook.start":
+    case "playbook.pause":
+    case "playbook.resume":
+    case "playbook.restart":
+    case "playbook.stop":
+      return { type: payload.type };
     default:
       return null;
   }
 }
 
-export function parsePaneServerMessage(raw: string): PaneServerMessage | null {
+export function parseServerToBrowserMessage(raw: string): ServerToBrowserMessage | null {
   const payload = parseObject(raw);
-  if (!payload) {
-    return null;
-  }
-
-  if (!isPaneName(payload.pane) || typeof payload.type !== "string") {
+  if (!payload || typeof payload.type !== "string") {
     return null;
   }
 
   switch (payload.type) {
     case "pane.meta":
       if (
+        !isPaneName(payload.pane) ||
         typeof payload.shell !== "string" ||
         typeof payload.cwd !== "string" ||
         typeof payload.prompt !== "string"
@@ -192,98 +136,103 @@ export function parsePaneServerMessage(raw: string): PaneServerMessage | null {
         prompt: payload.prompt,
       };
     case "pane.output":
-      if (typeof payload.data !== "string") {
+      if (!isPaneName(payload.pane) || typeof payload.data !== "string") {
+        return null;
+      }
+      return { type: "pane.output", pane: payload.pane, data: payload.data };
+    case "pane.status":
+      if (
+        !isPaneName(payload.pane) ||
+        (payload.status !== "ready" && payload.status !== "closed" && payload.status !== "error")
+      ) {
         return null;
       }
       return {
-        type: "pane.output",
+        type: "pane.status",
         pane: payload.pane,
-        data: payload.data,
+        status: payload.status,
+        message: optionalString(payload.message),
       };
-    case "pane.exec.completed":
-      if (!isExecResult(payload.result)) {
+    case "playbook.state":
+      if (!isPlaybookState(payload.state)) {
         return null;
       }
       return {
-        type: "pane.exec.completed",
-        pane: payload.pane,
-        result: payload.result,
+        type: "playbook.state",
+        state: payload.state,
+        action: optionalString(payload.action),
+        error: optionalString(payload.error),
       };
-    case "pane.action.completed":
-      if (typeof payload.id !== "string") {
+    case "recording.state":
+      if (!isRecordingState(payload.state)) {
         return null;
       }
       return {
-        type: "pane.action.completed",
-        pane: payload.pane,
-        id: payload.id,
+        type: "recording.state",
+        state: payload.state,
+        action: optionalString(payload.action),
+        error: optionalString(payload.error),
       };
-    case "pane.exit":
-      if (!isNullableNumber(payload.exitCode) || !isNullableNumber(payload.signal)) {
-        return null;
-      }
-      return {
-        type: "pane.exit",
-        pane: payload.pane,
-        exitCode: payload.exitCode,
-        signal: payload.signal,
-      };
-    case "pane.error":
+    case "preview.error":
       if (typeof payload.message !== "string") {
         return null;
       }
-      return {
-        type: "pane.error",
-        pane: payload.pane,
-        message: payload.message,
-      };
+      return { type: "preview.error", message: payload.message };
     default:
       return null;
   }
 }
 
-function parseObject(raw: string) {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed)) {
-      return null;
-    }
+export const parsePaneClientMessage = parseBrowserToServerMessage;
+export const parsePaneServerMessage = parseServerToBrowserMessage;
 
-    return parsed;
-  } catch {
-    return null;
-  }
+function parseObject(raw: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {}
+
+  return null;
 }
 
 function isPaneName(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-function isExecResult(value: unknown): value is ExecResult {
-  if (!isRecord(value)) {
-    return false;
-  }
-
+function isPlaybookState(value: unknown) {
   return (
-    typeof value.command === "string" &&
-    typeof value.exitCode === "number" &&
-    typeof value.raw === "string" &&
-    typeof value.text === "string" &&
-    Array.isArray(value.lines) &&
-    value.lines.every((line) => typeof line === "string") &&
-    typeof value.startedAt === "number" &&
-    typeof value.endedAt === "number"
+    value === "idle" ||
+    value === "running" ||
+    value === "stopped" ||
+    value === "done" ||
+    value === "error"
   );
 }
 
-function isNullableNumber(value: unknown): value is number | null {
-  return value === null || typeof value === "number";
+function isRecordingState(value: unknown) {
+  return value === "ready" || value === "started" || value === "done" || value === "error";
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+export function isExecResult(value: unknown): value is ExecResult {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as ExecResult).command === "string" &&
+    typeof (value as ExecResult).exitCode === "number" &&
+    typeof (value as ExecResult).raw === "string" &&
+    typeof (value as ExecResult).text === "string" &&
+    Array.isArray((value as ExecResult).lines) &&
+    typeof (value as ExecResult).startedAt === "number" &&
+    typeof (value as ExecResult).endedAt === "number"
+  );
 }

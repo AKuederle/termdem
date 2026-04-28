@@ -6,8 +6,6 @@ import {
   type TerminalPaneComponents,
 } from "@akuederle/termdem";
 
-const VIM = "vim -Nu NONE -n -i NONE";
-
 const repo = new TmpDir({
   setup: async () => {
     // The repository is intentionally empty. File authoring happens visibly via Vim.
@@ -19,6 +17,9 @@ const demo = createTerminalDemo(
     {
       name: "git",
       pwd: repo,
+      // Keep the recording focused on `vim README.md`, while making Vim deterministic:
+      // ignore user config/history, skip swap files, and make Esc resolve quickly.
+      setupCommand: `alias vim='vim -Nu NONE -n -i NONE --cmd "set ttimeout ttimeoutlen=10"'`,
     },
   ],
   async (api) => {
@@ -27,8 +28,7 @@ const demo = createTerminalDemo(
     await git.exec("git init");
     await git.exec("git config user.name 'termdem' && git config user.email 'demo@example.test'");
 
-    await git.type(`${VIM} README.md`);
-    await git.press(keys.ENTER);
+    await git.sendLine("vim README.md");
     await api.wait(600);
     await git.type("i# termdem git demo\n\nCreated from raw Vim keystrokes.\n");
     await git.type(keys.ESC);
@@ -37,8 +37,7 @@ const demo = createTerminalDemo(
     await git.press(keys.ENTER);
     await api.wait(600);
 
-    await git.type(`${VIM} README.md`);
-    await git.press(keys.ENTER);
+    await git.sendLine("vim README.md");
     await api.wait(600);
     await git.type("Go\nEdited in a second Vim session.\n");
     await git.type(keys.ESC);

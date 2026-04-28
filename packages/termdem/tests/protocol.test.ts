@@ -1,65 +1,66 @@
 import { expect, test } from "vite-plus/test";
-import { parsePaneClientMessage, parsePaneServerMessage } from "../src/protocol.ts";
+import { parseBrowserToServerMessage, parseServerToBrowserMessage } from "../src/protocol.ts";
 
-test("parsePaneClientMessage accepts exec messages with typing delay", () => {
-  const message = parsePaneClientMessage(
-    JSON.stringify({
-      type: "pane.exec",
-      pane: "main",
-      command: "command ls -1 --color=never",
-      typeDelayMs: 40,
-    }),
-  );
-
-  expect(message).toEqual({
-    type: "pane.exec",
-    pane: "main",
-    command: "command ls -1 --color=never",
-    typeDelayMs: 40,
-  });
-});
-
-test("parsePaneClientMessage accepts action ids for ordered keystrokes", () => {
-  const message = parsePaneClientMessage(
-    JSON.stringify({
-      type: "pane.type",
-      id: "action-1",
-      pane: "main",
-      text: "vim README.md",
-      typeDelayMs: 20,
-    }),
-  );
-
-  expect(message).toEqual({
-    type: "pane.type",
-    id: "action-1",
-    pane: "main",
-    text: "vim README.md",
-    typeDelayMs: 20,
-  });
-});
-
-test("parsePaneClientMessage accepts raw enter key presses", () => {
-  const message = parsePaneClientMessage(
-    JSON.stringify({
-      type: "pane.press",
-      id: "action-2",
-      pane: "main",
-      key: "\r",
-    }),
-  );
-
-  expect(message).toEqual({
-    type: "pane.press",
-    id: "action-2",
-    pane: "main",
-    key: "\r",
-  });
-});
-
-test("parsePaneClientMessage rejects malformed pane messages", () => {
+test("parseBrowserToServerMessage accepts pane resize and input messages", () => {
   expect(
-    parsePaneClientMessage(
+    parseBrowserToServerMessage(
+      JSON.stringify({
+        type: "pane.resize",
+        pane: "main",
+        cols: 120,
+        rows: 30,
+      }),
+    ),
+  ).toEqual({
+    type: "pane.resize",
+    pane: "main",
+    cols: 120,
+    rows: 30,
+  });
+
+  expect(
+    parseBrowserToServerMessage(
+      JSON.stringify({
+        type: "pane.input",
+        pane: "main",
+        data: "a",
+      }),
+    ),
+  ).toEqual({
+    type: "pane.input",
+    pane: "main",
+    data: "a",
+  });
+});
+
+test("parseBrowserToServerMessage accepts playbook controls and rejects browser playbook actions", () => {
+  expect(parseBrowserToServerMessage(JSON.stringify({ type: "playbook.start" }))).toEqual({
+    type: "playbook.start",
+  });
+
+  expect(
+    parseBrowserToServerMessage(
+      JSON.stringify({
+        type: "pane.exec",
+        pane: "main",
+        command: "node health.js",
+      }),
+    ),
+  ).toBeNull();
+  expect(
+    parseBrowserToServerMessage(
+      JSON.stringify({
+        type: "pane.hiddenExec",
+        pane: "main",
+        command: "node health.js",
+      }),
+    ),
+  ).toBeNull();
+});
+
+test("parseBrowserToServerMessage rejects malformed pane messages", () => {
+  expect(
+    parseBrowserToServerMessage(
       JSON.stringify({
         type: "pane.resize",
         pane: "",
@@ -70,50 +71,53 @@ test("parsePaneClientMessage rejects malformed pane messages", () => {
   ).toBeNull();
 });
 
-test("parsePaneServerMessage accepts action completion payloads", () => {
-  const message = parsePaneServerMessage(
-    JSON.stringify({
-      type: "pane.action.completed",
-      pane: "main",
-      id: "action-1",
-    }),
-  );
-
-  expect(message).toEqual({
-    type: "pane.action.completed",
+test("parseServerToBrowserMessage accepts pane, playbook, recording, and preview messages", () => {
+  expect(
+    parseServerToBrowserMessage(
+      JSON.stringify({
+        type: "pane.meta",
+        pane: "main",
+        shell: "/bin/bash",
+        cwd: "/tmp/demo",
+        prompt: "(main) $ ",
+      }),
+    ),
+  ).toEqual({
+    type: "pane.meta",
     pane: "main",
-    id: "action-1",
+    shell: "/bin/bash",
+    cwd: "/tmp/demo",
+    prompt: "(main) $ ",
   });
-});
 
-test("parsePaneServerMessage accepts command completion payloads", () => {
-  const message = parsePaneServerMessage(
-    JSON.stringify({
-      type: "pane.exec.completed",
-      pane: "main",
-      result: {
-        command: "cat 'alpha.txt'",
-        exitCode: 0,
-        raw: "alpha file\r\n",
-        text: "alpha file",
-        lines: ["alpha file"],
-        startedAt: 1,
-        endedAt: 2,
-      },
-    }),
-  );
+  expect(
+    parseServerToBrowserMessage(
+      JSON.stringify({
+        type: "playbook.state",
+        state: "running",
+        action: "waitFor(listener ready)",
+      }),
+    ),
+  ).toEqual({
+    type: "playbook.state",
+    state: "running",
+    action: "waitFor(listener ready)",
+    error: undefined,
+  });
 
-  expect(message).toEqual({
-    type: "pane.exec.completed",
-    pane: "main",
-    result: {
-      command: "cat 'alpha.txt'",
-      exitCode: 0,
-      raw: "alpha file\r\n",
-      text: "alpha file",
-      lines: ["alpha file"],
-      startedAt: 1,
-      endedAt: 2,
-    },
+  expect(
+    parseServerToBrowserMessage(JSON.stringify({ type: "recording.state", state: "done" })),
+  ).toEqual({
+    type: "recording.state",
+    state: "done",
+    action: undefined,
+    error: undefined,
+  });
+
+  expect(
+    parseServerToBrowserMessage(JSON.stringify({ type: "preview.error", message: "boom" })),
+  ).toEqual({
+    type: "preview.error",
+    message: "boom",
   });
 });

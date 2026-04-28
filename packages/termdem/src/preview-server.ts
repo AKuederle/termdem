@@ -7,15 +7,10 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { createServer, type Alias, type Plugin, type ViteDevServer } from "vite";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
-import { createPaneSession } from "./pane-session.ts";
-import {
-  parsePaneClientMessage,
-  type PaneActionCompletedMessage,
-  type PaneClientMessage,
-  type PaneServerMessage,
-} from "./protocol.ts";
+import { PlaybookRuntime } from "./playbook-runtime.ts";
+import { parseBrowserToServerMessage, type ServerToBrowserMessage } from "./protocol.ts";
 import type { TerminalDemo } from "./terminal-demo.ts";
-import { createTerminalWorkspace, type TerminalWorkspaceDefinition } from "./workspace.ts";
+import type { TerminalWorkspaceDefinition } from "./workspace.ts";
 
 export type PreviewServerOptions = {
   demoPath: string;
@@ -28,11 +23,6 @@ export type TermdemPreviewServer = {
   close(): Promise<void>;
   demo: PreviewDemoModule;
   urls: string[];
-};
-
-type PaneWorkspace = {
-  cwd: string;
-  dispose(): Promise<void>;
 };
 
 type PreviewDemoModule = Partial<TerminalDemo<readonly TerminalWorkspaceDefinition[]>>;
@@ -60,11 +50,13 @@ export async function startPreviewServer(
   const reactJsxDevRuntimeSsrShimPath = join(root, "react-jsx-dev-runtime-ssr-shim.mjs");
   const reactJsxRuntimeSsrShimPath = join(root, "react-jsx-runtime-ssr-shim.mjs");
   const packageRuntimeDir = dirname(fileURLToPath(import.meta.url));
+  const host = options.host ?? "127.0.0.1";
 
   try {
     await mkdir(dirname(entryPath), { recursive: true });
     await linkBrowserDependency(root, "react");
     await linkBrowserDependency(root, "react-dom");
+    await linkBrowserDependency(root, "tailwindcss");
     await writeFile(join(root, "index.html"), previewHtml(), "utf8");
     await writeFile(clientShimPath, clientShimSource(), "utf8");
     await writeFile(reactSsrShimPath, reactSsrShimSource(), "utf8");
@@ -120,7 +112,7 @@ export async function startPreviewServer(
         fs: {
           allow: [root, dirname(demoPath), packageRuntimeDir, process.cwd()],
         },
-        host: options.host ?? "127.0.0.1",
+        host,
         open: options.open ?? true,
         port: options.port,
         sourcemapIgnoreList(sourcePath) {
@@ -153,6 +145,14 @@ export async function startPreviewServer(
 function ptyBridge({ demoPath }: { demoPath: string }): Plugin {
   const wss = new WebSocketServer({ noServer: true });
   let viteServer: ViteDevServer | null = null;
+  let runtime: PlaybookRuntime | null = null;
+  const clients = new Set<WebSocket>();
+
+  const broadcast = (message: ServerToBrowserMessage) => {
+    for (const client of clients) {
+      sendPreviewMessage(client, message);
+    }
+  };
 
   return {
     name: "termdem-pty-bridge",
@@ -161,7 +161,7 @@ function ptyBridge({ demoPath }: { demoPath: string }): Plugin {
       server.httpServer?.on("upgrade", (request, socket, head) => {
         const url = request.url ? new URL(request.url, "http://localhost") : null;
 
-        if (!url?.pathname.startsWith("/panes/")) {
+        if (url?.pathname !== "/preview") {
           return;
         }
 
@@ -177,12 +177,15 @@ function ptyBridge({ demoPath }: { demoPath: string }): Plugin {
           return;
         }
 
-        const paneName = decodeURIComponent(url.pathname.slice("/panes/".length)) || "main";
-
         wss.handleUpgrade(request, socket, head, (ws) => {
-          void wireSession({
+          void wirePreviewClient({
+            broadcast,
+            clients,
             demoPath,
-            paneName,
+            getRuntime: () => runtime,
+            saveRuntime(nextRuntime) {
+              runtime = nextRuntime;
+            },
             viteServer: assertViteServer(viteServer),
             ws,
           });
@@ -190,6 +193,7 @@ function ptyBridge({ demoPath }: { demoPath: string }): Plugin {
       });
 
       server.httpServer?.once("close", () => {
+        void runtime?.close();
         wss.close();
       });
     },
@@ -208,163 +212,110 @@ function ptyBridge({ demoPath }: { demoPath: string }): Plugin {
   };
 }
 
-async function wireSession({
+async function wirePreviewClient({
+  broadcast,
+  clients,
   demoPath,
-  paneName,
+  getRuntime,
+  saveRuntime,
   viteServer,
   ws,
 }: {
+  broadcast: (message: ServerToBrowserMessage) => void;
+  clients: Set<WebSocket>;
   demoPath: string;
-  paneName: string;
+  getRuntime: () => PlaybookRuntime | null;
+  saveRuntime: (runtime: PlaybookRuntime) => void;
   viteServer: ViteDevServer;
   ws: WebSocket;
 }) {
-  let workspace: PaneWorkspace | null = null;
-  let session: Awaited<ReturnType<typeof createPaneSession>> | null = null;
-  let closed = false;
-  let messageQueue = Promise.resolve();
-
-  const shutdown = async () => {
-    if (closed) {
-      return;
-    }
-
-    closed = true;
-    await session?.close();
-    await workspace?.dispose();
-  };
-
   const fail = async (error: unknown) => {
-    sendPaneMessage(ws, {
-      type: "pane.error",
-      pane: paneName,
+    sendPreviewMessage(ws, {
+      type: "preview.error",
       message: formatError(error),
     });
-    await shutdown();
     closeWebSocket(ws);
   };
 
+  clients.add(ws);
   ws.on("close", () => {
-    void shutdown();
+    clients.delete(ws);
   });
 
   ws.on("error", () => {
-    void shutdown();
+    clients.delete(ws);
   });
 
   try {
     const demo = await loadDemoModule(viteServer, demoPath);
-    workspace = await createPaneWorkspace(demo, paneName);
-    if (closed) {
-      await shutdown();
-      return;
+    let activeRuntime = getRuntime();
+    if (!activeRuntime) {
+      activeRuntime = new PlaybookRuntime({
+        onPaneMeta(message) {
+          broadcast({ type: "pane.meta", ...message });
+        },
+        onPaneOutput(message) {
+          broadcast({ type: "pane.output", ...message });
+        },
+        onPaneStatus(status) {
+          broadcast({ type: "pane.status", ...status });
+        },
+        onPlaybookState(state) {
+          broadcast({ type: "playbook.state", ...state });
+        },
+        onRecordingState(state) {
+          broadcast({ type: "recording.state", ...state });
+        },
+        terminalDefinitions: demo.terminalDefinitions ?? [],
+        typeDelayMs: demo.config?.typeDelayMs,
+      });
+      saveRuntime(activeRuntime);
+      await activeRuntime.ensureReady();
     }
-
-    const shell = process.env.TERMDEM_SHELL ?? "/bin/bash";
-    const prompt = `(${paneName}) $ `;
-    session = await createPaneSession({
-      cwd: workspace.cwd,
-      shell,
-      cols: 20,
-      rows: 8,
-      prompt,
-      onOutput(data) {
-        sendPaneMessage(ws, {
-          type: "pane.output",
-          pane: paneName,
-          data,
-        });
-      },
-    });
-
-    if (closed) {
-      await shutdown();
-      return;
-    }
-
-    sendPaneMessage(ws, {
-      type: "pane.meta",
-      pane: paneName,
-      shell,
-      cwd: workspace.cwd,
-      prompt,
-    });
 
     ws.on("message", (message) => {
-      messageQueue = messageQueue
-        .then(async () => {
-          if (!session) {
-            return;
-          }
-
-          const parsed = parsePaneClientMessage(rawDataToString(message));
-          if (!parsed || parsed.pane !== paneName) {
-            return;
-          }
-
-          await handlePaneClientMessage(session, parsed, (serverMessage) => {
-            sendPaneMessage(ws, serverMessage);
-          });
-          sendActionCompleted(ws, parsed);
-        })
-        .catch(async (error) => {
-          await fail(error);
-        });
+      void handleBrowserMessage(demo, activeRuntime, rawDataToString(message)).catch(fail);
     });
   } catch (error) {
     await fail(error);
   }
 }
 
-async function handlePaneClientMessage(
-  session: Awaited<ReturnType<typeof createPaneSession>>,
-  parsed: PaneClientMessage,
-  send: (message: PaneServerMessage) => void,
+async function handleBrowserMessage(
+  demo: PreviewDemoModule,
+  runtime: PlaybookRuntime,
+  rawMessage: string,
 ) {
+  const parsed = parseBrowserToServerMessage(rawMessage);
+  if (!parsed) {
+    return;
+  }
+
   switch (parsed.type) {
     case "pane.input":
-      if (parsed.data === "\r") {
-        await session.press("Enter");
-        return;
-      }
-
-      await session.type(parsed.data);
+      await runtime.inputPane(parsed.pane, parsed.data);
       return;
     case "pane.resize":
-      await session.resize(parsed.cols, parsed.rows);
+      await runtime.resizePane(parsed.pane, parsed.cols, parsed.rows);
       return;
-    case "pane.type":
-      await session.type(parsed.text, { typeDelayMs: parsed.typeDelayMs });
+    case "playbook.start":
+    case "playbook.resume":
+      if (demo.script) {
+        await runtime.run(demo.script);
+      }
       return;
-    case "pane.press":
-      await session.press(parsed.key);
+    case "playbook.pause":
+    case "playbook.stop":
+      runtime.stop();
       return;
-    case "pane.exec": {
-      const result = await session.exec(parsed.command, {
-        typeDelayMs: parsed.typeDelayMs,
-      });
-      send({
-        type: "pane.exec.completed",
-        pane: parsed.pane,
-        result,
-      });
+    case "playbook.restart":
+      if (demo.script) {
+        await runtime.restart(demo.script);
+      }
       return;
-    }
     default:
       parsed satisfies never;
   }
-}
-
-async function createPaneWorkspace(
-  demo: PreviewDemoModule,
-  paneName: string,
-): Promise<PaneWorkspace> {
-  const terminal = demo.terminalDefinitions?.find((definition) => definition.name === paneName);
-  if (!terminal) {
-    throw new Error(`Demo does not define terminal "${paneName}"`);
-  }
-
-  return createTerminalWorkspace(terminal);
 }
 
 async function loadDemoModule(viteServer: ViteDevServer, demoPath: string) {
@@ -389,19 +340,7 @@ function isPreviewDemoModule(value: unknown): value is PreviewDemoModule {
   return typeof value === "object" && value !== null && "terminalDefinitions" in value;
 }
 
-function sendActionCompleted(ws: WebSocket, message: PaneClientMessage) {
-  if (!("id" in message) || !message.id) {
-    return;
-  }
-
-  sendPaneMessage(ws, {
-    type: "pane.action.completed",
-    pane: message.pane,
-    id: message.id,
-  } satisfies PaneActionCompletedMessage);
-}
-
-function sendPaneMessage(ws: WebSocket, message: PaneServerMessage) {
+function sendPreviewMessage(ws: WebSocket, message: ServerToBrowserMessage) {
   if (ws.readyState !== WebSocket.OPEN) {
     return;
   }
@@ -565,7 +504,6 @@ import { renderPreviewApp } from "@akuederle/termdem/preview-client";
 renderPreviewApp({
   config: demo.config,
   render,
-  script: demo.script,
   terminalDefinitions: demo.terminalDefinitions,
 });
 `;
@@ -621,9 +559,6 @@ export function quoteShellArg(value) {
   return \`'\${value.replaceAll("'", "'\\\\''")}'\`;
 }
 
-export async function execNode() {
-  throw new Error("execNode is only available while the preview server loads terminal setup code.");
-}
 `;
 }
 

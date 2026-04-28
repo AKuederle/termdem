@@ -23,6 +23,9 @@ switch (command) {
   case "status":
     await status();
     break;
+  case "health":
+    await health(process.argv[3]);
+    break;
   case "cleanup":
     await cleanup();
     break;
@@ -71,6 +74,11 @@ async function serve() {
         if (event.type === "send") {
           broadcast(listeners, event.message);
           socket.end();
+          continue;
+        }
+
+        if (event.type === "health") {
+          socket.end(`${JSON.stringify({ type: "health", listenerCount: listeners.size })}\n`);
         }
       }
     });
@@ -94,6 +102,12 @@ async function status() {
   console.log(`server url: ${state.url}`);
 }
 
+async function health(rawUrl) {
+  const state = rawUrl ? { url: rawUrl } : await readState();
+  const result = await requestHealth(state.url);
+  console.log(result.listenerCount > 0 ? "listener ready" : "server ready");
+}
+
 async function cleanup() {
   if (!existsSync(statePath)) {
     return;
@@ -104,6 +118,38 @@ async function cleanup() {
     process.kill(state.pid);
   } catch {}
   await rm(statePath, { force: true });
+}
+
+async function requestHealth(rawUrl) {
+  const url = new URL(rawUrl);
+  if (url.protocol !== "tcp:") {
+    throw new Error(`Expected tcp:// URL, got ${rawUrl}`);
+  }
+
+  return new Promise((resolve, reject) => {
+    const socket = net.createConnection(Number(url.port), url.hostname);
+    socket.setEncoding("utf8");
+    socket.setTimeout(1000);
+    let buffer = "";
+
+    socket.on("error", reject);
+    socket.on("timeout", () => {
+      socket.destroy(new Error("health check timed out"));
+    });
+    socket.on("connect", () => {
+      socket.write(`${JSON.stringify({ type: "health" })}\n`);
+    });
+    socket.on("data", (chunk) => {
+      buffer += chunk;
+    });
+    socket.on("close", () => {
+      try {
+        resolve(JSON.parse(buffer));
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
 }
 
 function broadcast(listeners, message) {
@@ -133,6 +179,6 @@ async function readState() {
 }
 
 function usage() {
-  console.error("usage: server.mjs setup|status|cleanup");
+  console.error("usage: server.mjs setup|status|health|cleanup");
   process.exit(1);
 }

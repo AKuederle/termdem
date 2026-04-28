@@ -1,16 +1,7 @@
 import { execFile } from "node:child_process";
+import type { ExecNodeOptions, ExecNodeResult } from "./types.ts";
 
-export type ExecNodeOptions = {
-  cwd?: string;
-  env?: NodeJS.ProcessEnv;
-  reject?: boolean;
-};
-
-export type ExecNodeResult = {
-  exitCode: number;
-  stderr: string;
-  stdout: string;
-};
+export type { ExecNodeOptions, ExecNodeResult } from "./types.ts";
 
 export class ExecNodeError extends Error {
   exitCode: number;

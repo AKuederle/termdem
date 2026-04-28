@@ -42,11 +42,19 @@ test("createTerminalDemo scripts can wait without selecting a pane", async () =>
   });
 
   await demo.script({
+    node: {
+      async execFile() {
+        throw new Error("node.execFile should not be required for wait");
+      },
+    },
     pane() {
       throw new Error("pane should not be required for wait");
     },
     async wait(delayMs) {
       calls.push(`wait:${delayMs}`);
+    },
+    async waitFor() {
+      throw new Error("waitFor should not be required for wait");
     },
   });
 

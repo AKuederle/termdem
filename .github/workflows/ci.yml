@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-and-test:
+    name: Check and test
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          cache: true
+
+      - name: Install ffmpeg
+        run: apt-get update && apt-get install -y ffmpeg
+
+      - name: Check
+        run: vp check
+
+      - name: Test
+        run: vp run -r test
+
+      - name: Build
+        run: vp run -r build
+
+      - name: Smoke test examples
+        run: vp run test:smoke

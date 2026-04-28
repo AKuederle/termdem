@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useEffectEvent,
@@ -11,61 +12,30 @@ import {
 import { createRoot } from "react-dom/client";
 import { Terminal, useTerminal } from "@wterm/react";
 import "@wterm/react/css";
-import { waitForPlaybookDelay } from "./playbook-wait.ts";
-import { parsePaneServerMessage, type PaneClientMessage } from "./protocol.ts";
+import {
+  parseServerToBrowserMessage,
+  type BrowserToServerMessage,
+  type ServerToBrowserMessage,
+} from "./protocol.ts";
 import type { RecordingConfig } from "./recording-config.ts";
 import type { TerminalPaneComponent, TerminalPaneProps } from "./terminal-demo.ts";
-import { typingDelays } from "./typing-delays.ts";
-import type { ExecResult, PaneController, PressKey, TypeOptions } from "./types.ts";
-
-type PreviewMode = "running" | "stopped";
 
 type PreviewDemoModule = {
   config: RecordingConfig;
   render: (panes: Record<string, TerminalPaneComponent>) => ReactNode;
-  script?: (api: {
-    pane(name: string): PaneController;
-    wait(delayMs: number): Promise<void>;
-  }) => Promise<void> | void;
   terminalDefinitions: readonly { name: string }[];
 };
 
-type PaneRuntime = PaneController & {
-  connectionKey: number;
-  ready: boolean;
-  write(data: string): void;
+type PreviewSocketContextValue = {
+  addPaneListener(name: string, listener: (message: ServerToBrowserMessage) => void): () => void;
+  send(message: BrowserToServerMessage): void;
 };
-
-type ReadyPaneRuntime = PaneController & {
-  ready: boolean;
-};
-
-type PendingAction = {
-  reject: (error: Error) => void;
-  resolve: () => void;
-};
-
-type PendingExec = {
-  reject: (error: Error) => void;
-  resolve: (result: ExecResult) => void;
-};
-
-type AwaitedPaneActionMessage =
-  | {
-      type: "pane.press";
-      key: PressKey;
-    }
-  | {
-      type: "pane.type";
-      text: string;
-      typeDelayMs?: number;
-    };
 
 const paneFrameClassName =
   "flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#101010] text-slate-100";
 
-const ignoreTerminalInput = () => {};
 const CurrentPaneNameContext = createContext<string | null>(null);
+const PreviewSocketContext = createContext<PreviewSocketContextValue | null>(null);
 
 export function paneFrameDataAttributes(name: string, isCurrent: boolean) {
   return {
@@ -87,25 +57,49 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   const paneNames = useInitialValue(() =>
     paneNamesFromTerminalDefinitions(demo.terminalDefinitions),
   );
-  const initialPreviewMode = useInitialValue(() => readInitialPreviewMode());
-  const paneRuntimesRef = useRef(new Map<string, PaneRuntime>());
-  const paneMountCountsRef = useRef(new Map<string, number>());
-  const paneMountErrorRef = useRef<string | null>(null);
-  const playbookRunIdRef = useRef(0);
-  const previewModeRef = useRef<PreviewMode>(initialPreviewMode);
-  const resumeWaitersRef = useRef<Array<() => void>>([]);
-  const runningPlaybookKeyRef = useRef<string | null>(null);
+  const initialAutostart = useInitialValue(() => readInitialAutostart());
   const [currentPaneName, setCurrentPaneName] = useState<string | null>(null);
-  const [paneMountError, setPaneMountError] = useState<string | null>(null);
-  const [paneMountVersion, setPaneMountVersion] = useState(0);
   const [overlayVisible, setOverlayVisible] = useState(false);
-  const [previewMode, setPreviewMode] = useState<PreviewMode>(initialPreviewMode);
-  const [runtimeVersion, setRuntimeVersion] = useState(0);
-  const [sessionKey, setSessionKey] = useState(0);
+  const [socketStatus, setSocketStatus] = useState<"connecting" | "open" | "closed" | "error">(
+    "connecting",
+  );
+  const listenersRef = useRef(new Map<string, Set<(message: ServerToBrowserMessage) => void>>());
+  const socketRef = useRef<WebSocket | null>(null);
 
-  useEffect(() => {
-    previewModeRef.current = previewMode;
-  }, [previewMode]);
+  const send = useEffectEvent((message: BrowserToServerMessage) => {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      throw new Error("Preview socket is not connected");
+    }
+
+    socket.send(JSON.stringify(message));
+  });
+
+  const addPaneListener = useCallback(
+    (name: string, listener: (message: ServerToBrowserMessage) => void) => {
+      let listeners = listenersRef.current.get(name);
+      if (!listeners) {
+        listeners = new Set();
+        listenersRef.current.set(name, listeners);
+      }
+
+      listeners.add(listener);
+      return () => {
+        listeners?.delete(listener);
+      };
+    },
+    [],
+  );
+
+  const socketContext = useMemo(
+    () => ({
+      addPaneListener,
+      send,
+    }),
+    [addPaneListener, send],
+  );
+
+  const paneComponents = useMemo(() => createPaneComponents(paneNames), [paneNames]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -126,203 +120,223 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
     };
   }, []);
 
-  const onRuntimeChange = useEffectEvent((name: string, runtime: PaneRuntime) => {
-    paneRuntimesRef.current.set(name, runtime);
-    setRuntimeVersion((version) => version + 1);
-  });
+  useEffect(() => {
+    const socket = new WebSocket(previewSocketUrl());
+    socketRef.current = socket;
+    setSocketStatus("connecting");
 
-  const onPaneMountChange = useEffectEvent((name: string, delta: number) => {
-    const counts = paneMountCountsRef.current;
-    const nextCount = (counts.get(name) ?? 0) + delta;
-    if (nextCount <= 0) {
-      counts.delete(name);
-    } else {
-      counts.set(name, nextCount);
-    }
-
-    setPaneMountVersion((version) => version + 1);
-  });
-
-  const paneComponents = useMemo(
-    () => createPaneComponents(paneNames, sessionKey, onPaneMountChange, onRuntimeChange),
-    [onPaneMountChange, onRuntimeChange, paneNames, sessionKey],
-  );
-
-  const resumePlaybook = useEffectEvent(() => {
-    previewModeRef.current = "running";
-    setPreviewMode("running");
-
-    const waiters = resumeWaitersRef.current.splice(0);
-    for (const resolve of waiters) {
-      resolve();
-    }
-  });
-
-  const stopPlaybook = useEffectEvent(() => {
-    previewModeRef.current = "stopped";
-    setPreviewMode("stopped");
-  });
-
-  const restartPreview = useEffectEvent(() => {
-    playbookRunIdRef.current += 1;
-    paneRuntimesRef.current.clear();
-    runningPlaybookKeyRef.current = null;
-    setCurrentPaneName(null);
-    resumePlaybook();
-
-    const waiters = resumeWaitersRef.current.splice(0);
-    for (const resolve of waiters) {
-      resolve();
-    }
-
-    setRuntimeVersion((version) => version + 1);
-    setSessionKey((key) => key + 1);
-    markRecordingDone(false);
-  });
-
-  const waitForPlaybookActive = useEffectEvent(async (runId: number) => {
-    while (previewModeRef.current !== "running") {
-      if (playbookRunIdRef.current !== runId) {
-        throw new Error("Playbook restarted");
+    socket.onopen = () => {
+      setSocketStatus("open");
+      if (initialAutostart) {
+        socket.send(JSON.stringify({ type: "playbook.start" }));
       }
+    };
 
-      await new Promise<void>((resolve) => {
-        resumeWaitersRef.current.push(resolve);
-      });
-    }
+    socket.onerror = () => {
+      setSocketStatus("error");
+      markRecordingError("Preview socket failed");
+    };
 
-    if (playbookRunIdRef.current !== runId) {
-      throw new Error("Playbook restarted");
-    }
-  });
-
-  const runPlaybook = useEffectEvent(async (runId: number) => {
-    markRecordingStarted();
-
-    if (!demo.script) {
-      markRecordingDone(true);
-      return;
-    }
-
-    try {
-      await demo.script(
-        createPlaybookApi(
-          paneRuntimesRef.current,
-          () => waitForPlaybookActive(runId),
-          setCurrentPaneName,
-          demo.config.typeDelayMs,
-        ),
-      );
-      if (runId === playbookRunIdRef.current) {
-        markRecordingDone(true);
+    socket.onclose = () => {
+      if (socketRef.current === socket) {
+        socketRef.current = null;
       }
-    } catch (error) {
-      if (runId !== playbookRunIdRef.current || formatError(error) === "Playbook restarted") {
+      setSocketStatus((status) => (status === "error" ? "error" : "closed"));
+    };
+
+    socket.onmessage = (event) => {
+      if (typeof event.data !== "string") {
         return;
       }
 
-      const firstPane = paneRuntimesRef.current.get(paneNames[0] ?? "");
-      const message = formatError(error);
-      firstPane?.write(`\r\n\x1b[31m[playbook error] ${message}\x1b[0m\r\n`);
-      markRecordingError(message);
-    }
-  });
+      const message = parseServerToBrowserMessage(event.data);
+      if (!message) {
+        return;
+      }
 
-  useEffect(() => {
-    markRecordingDone(false);
-  }, []);
+      switch (message.type) {
+        case "pane.output":
+        case "pane.meta":
+        case "pane.status": {
+          const listeners = listenersRef.current.get(message.pane);
+          for (const listener of listeners ?? []) {
+            listener(message);
+          }
+          return;
+        }
+        case "playbook.state":
+          if (message.state === "running") {
+            setCurrentPaneName(paneNameFromAction(message.action) ?? currentPaneName);
+          }
+          if (message.state === "error") {
+            markRecordingError(message.error ?? "Playbook failed");
+          }
+          return;
+        case "recording.state":
+          updateRecordingState(message);
+          return;
+        case "preview.error":
+          markRecordingError(message.message);
+          return;
+        default:
+          message satisfies never;
+      }
+    };
+
+    return () => {
+      if (socketRef.current === socket) {
+        socketRef.current = null;
+      }
+      socket.close();
+    };
+  }, [initialAutostart]);
 
   useEffect(() => {
     globalThis.__termdem = {
       ...globalThis.__termdem,
       controls: {
-        start: resumePlaybook,
+        restart: () => send({ type: "playbook.restart" }),
+        start: () => send({ type: "playbook.start" }),
+        stop: () => send({ type: "playbook.stop" }),
       },
     };
 
     return () => {
-      if (globalThis.__termdem?.controls?.start === resumePlaybook) {
-        delete globalThis.__termdem.controls;
-      }
+      delete globalThis.__termdem?.controls;
     };
-  }, [resumePlaybook]);
-
-  useEffect(() => {
-    const runtimes = paneRuntimesRef.current;
-    if (paneMountError) {
-      markRecordingReady(false);
-      return;
-    }
-
-    markRecordingReady(paneNames.every((name) => runtimes.get(name)?.ready));
-  }, [paneMountError, paneNames, runtimeVersion]);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      const nextError = paneMountErrorFromCounts(paneNames, paneMountCountsRef.current);
-      const previousError = paneMountErrorRef.current;
-      paneMountErrorRef.current = nextError;
-      setPaneMountError(nextError);
-
-      if (nextError) {
-        markRecordingReady(false);
-        markRecordingError(nextError);
-      } else if (previousError && globalThis.__termdem?.recording?.error === previousError) {
-        markRecordingError(undefined);
-      }
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [paneMountVersion, paneNames, sessionKey]);
-
-  useEffect(() => {
-    if (paneMountError) {
-      return;
-    }
-
-    if (previewMode !== "running") {
-      return;
-    }
-
-    const runtimes = paneRuntimesRef.current;
-    if (!paneNames.every((name) => runtimes.get(name)?.ready)) {
-      return;
-    }
-
-    const playbookKey = paneNames.map((name) => runtimes.get(name)?.connectionKey).join(":");
-    if (runningPlaybookKeyRef.current === playbookKey) {
-      return;
-    }
-
-    runningPlaybookKeyRef.current = playbookKey;
-    void runPlaybook(playbookRunIdRef.current);
-  }, [paneMountError, paneNames, previewMode, runPlaybook, runtimeVersion]);
+  }, [send]);
 
   return (
-    <>
+    <PreviewSocketContext value={socketContext}>
       <CurrentPaneNameContext value={currentPaneName}>
         {demo.render(paneComponents)}
       </CurrentPaneNameContext>
       {overlayVisible ? (
         <PreviewOverlay
-          mode={previewMode}
+          mode={socketStatus}
           onHide={() => {
             setOverlayVisible(false);
           }}
-          onRestart={() => {
-            restartPreview();
-          }}
-          onResume={() => {
-            resumePlaybook();
-          }}
-          onStop={() => {
-            stopPlaybook();
-          }}
+          onRestart={() => send({ type: "playbook.restart" })}
+          onStart={() => send({ type: "playbook.start" })}
+          onStop={() => send({ type: "playbook.stop" })}
         />
       ) : null}
-    </>
+    </PreviewSocketContext>
+  );
+}
+
+function PaneTerminalCard({
+  className,
+  name,
+  style,
+}: {
+  className?: string;
+  name: string;
+  style?: TerminalPaneProps["style"];
+}) {
+  const currentPaneName = useContext(CurrentPaneNameContext);
+  const previewSocket = usePreviewSocket();
+  const { ref, write } = useTerminal();
+  const [status, setStatus] = useState("connecting");
+
+  const handleMessage = useEffectEvent((message: ServerToBrowserMessage) => {
+    switch (message.type) {
+      case "pane.meta":
+        setStatus("ready");
+        return;
+      case "pane.output":
+        write(message.data);
+        return;
+      case "pane.status":
+        setStatus(message.status);
+        if (message.status === "error") {
+          write(`\r\n\x1b[31m[pane error] ${message.message ?? "unknown error"}\x1b[0m\r\n`);
+        }
+        return;
+      default:
+        return;
+    }
+  });
+
+  useEffect(() => previewSocket.addPaneListener(name, handleMessage), [handleMessage, name]);
+
+  return (
+    <article
+      {...paneFrameDataAttributes(name, currentPaneName === name)}
+      className={`${paneFrameClassName} ${className ?? ""}`}
+      style={style}
+    >
+      <header className="flex h-6 shrink-0 items-center border-b border-[#2f2f2f] bg-[#1b1b1b] px-2 font-mono text-[11px] font-semibold leading-none text-cyan-300">
+        {name}
+      </header>
+
+      <Terminal
+        ref={ref}
+        aria-label={`${name} terminal (${status})`}
+        className="min-h-0 flex-1 overflow-hidden !rounded-none"
+        cols={20}
+        rows={8}
+        style={{ padding: 0 }}
+        theme="monokai"
+        autoResize
+        cursorBlink
+        onData={(data) => {
+          previewSocket.send({ type: "pane.input", pane: name, data });
+        }}
+        onResize={(cols, rows) => {
+          previewSocket.send({ type: "pane.resize", pane: name, cols, rows });
+        }}
+        tabIndex={0}
+      />
+    </article>
+  );
+}
+
+function createPaneComponents(paneNames: string[]) {
+  const panes = Object.fromEntries(
+    paneNames.map((name) => {
+      function TermdemPane({ className, style }: TerminalPaneProps) {
+        return <PaneTerminalCard className={className} name={name} style={style} />;
+      }
+
+      TermdemPane.displayName = `TermdemPane(${name})`;
+      return [name, TermdemPane];
+    }),
+  );
+
+  return panes as Record<string, TerminalPaneComponent>;
+}
+
+function PreviewOverlay({
+  mode,
+  onHide,
+  onRestart,
+  onStart,
+  onStop,
+}: {
+  mode: string;
+  onHide: () => void;
+  onRestart: () => void;
+  onStart: () => void;
+  onStop: () => void;
+}) {
+  return (
+    <div className="fixed right-4 top-4 z-50 flex items-center gap-2 rounded bg-black/80 p-2 font-mono text-xs text-white shadow-lg">
+      <span>{mode}</span>
+      <button className="rounded bg-cyan-600 px-2 py-1" type="button" onClick={onStart}>
+        Start
+      </button>
+      <button className="rounded bg-slate-700 px-2 py-1" type="button" onClick={onRestart}>
+        Restart
+      </button>
+      <button className="rounded bg-slate-700 px-2 py-1" type="button" onClick={onStop}>
+        Stop
+      </button>
+      <button className="rounded bg-slate-700 px-2 py-1" type="button" onClick={onHide}>
+        Close
+      </button>
+    </div>
   );
 }
 
@@ -342,444 +356,47 @@ function paneNamesFromTerminalDefinitions(terminalDefinitions: readonly { name: 
   return paneNames;
 }
 
-function PaneTerminalCard({
-  className,
-  name,
-  onMountChange,
-  onRuntimeChange,
-  style,
-}: {
-  className?: string;
-  name: string;
-  onMountChange: (name: string, delta: number) => void;
-  onRuntimeChange: (name: string, runtime: PaneRuntime) => void;
-  style?: TerminalPaneProps["style"];
-}) {
-  const { connectionKey, exec, press, ref, requestResize, status, type, write } =
-    usePaneConnection(name);
-  const currentPaneName = useContext(CurrentPaneNameContext);
-
-  useEffect(() => {
-    onMountChange(name, 1);
-
-    return () => {
-      onMountChange(name, -1);
-    };
-  }, [name, onMountChange]);
-
-  useEffect(() => {
-    onRuntimeChange(name, {
-      connectionKey,
-      exec,
-      press,
-      ready: status === "open",
-      type,
-      write,
-    });
-  }, [connectionKey, name, status]);
-
-  return (
-    <article
-      {...paneFrameDataAttributes(name, currentPaneName === name)}
-      className={`${paneFrameClassName} ${className ?? ""}`}
-      style={style}
-    >
-      <header className="flex h-6 shrink-0 items-center border-b border-[#2f2f2f] bg-[#1b1b1b] px-2 font-mono text-[11px] font-semibold leading-none text-cyan-300">
-        {name}
-      </header>
-
-      <Terminal
-        ref={ref}
-        aria-readonly
-        className="pointer-events-none min-h-0 flex-1 select-none overflow-hidden !rounded-none"
-        cols={20}
-        rows={8}
-        style={{ padding: 0 }}
-        theme="monokai"
-        autoResize
-        cursorBlink
-        onData={ignoreTerminalInput}
-        onResize={requestResize}
-        tabIndex={-1}
-      />
-    </article>
-  );
+function previewSocketUrl() {
+  const url = new URL("/preview", window.location.href);
+  url.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  url.searchParams.set("token", bridgeToken());
+  return url.toString();
 }
 
-function createPaneComponents(
-  paneNames: string[],
-  sessionKey: number,
-  onMountChange: (name: string, delta: number) => void,
-  onRuntimeChange: (name: string, runtime: PaneRuntime) => void,
+function bridgeToken() {
+  const token = document.querySelector<HTMLMetaElement>('meta[name="termdem-bridge-token"]');
+  if (!token?.content) {
+    throw new Error("Missing preview bridge token");
+  }
+
+  return token.content;
+}
+
+function readInitialAutostart() {
+  return new URL(window.location.href).searchParams.get("termdem_autostart") !== "0";
+}
+
+function updateRecordingState(
+  message: Extract<ServerToBrowserMessage, { type: "recording.state" }>,
 ) {
-  const panes = Object.fromEntries(
-    paneNames.map((name) => {
-      function TermdemPane({ className, style }: TerminalPaneProps) {
-        return (
-          <PaneTerminalCard
-            key={`${sessionKey}:${name}`}
-            className={className}
-            name={name}
-            onMountChange={onMountChange}
-            onRuntimeChange={onRuntimeChange}
-            style={style}
-          />
-        );
-      }
-
-      TermdemPane.displayName = `TermdemPane(${name})`;
-      return [name, TermdemPane];
-    }),
-  );
-
-  return panes as Record<string, TerminalPaneComponent>;
-}
-
-function paneMountErrorFromCounts(paneNames: string[], counts: Map<string, number>) {
-  const missingPaneNames = paneNames.filter((name) => !counts.has(name));
-  if (missingPaneNames.length > 0) {
-    return `Missing rendered pane component${missingPaneNames.length === 1 ? "" : "s"}: ${missingPaneNames.join(", ")}`;
-  }
-
-  const duplicatePaneNames = paneNames.filter((name) => (counts.get(name) ?? 0) > 1);
-  if (duplicatePaneNames.length > 0) {
-    return `Pane component rendered more than once: ${duplicatePaneNames.join(", ")}`;
-  }
-
-  return null;
-}
-
-function usePaneConnection(paneName: string) {
-  const actionIdRef = useRef(0);
-  const latestResizeRef = useRef<{ cols: number; rows: number } | null>(null);
-  const socketRef = useRef<WebSocket | null>(null);
-  const pendingActionsRef = useRef(new Map<string, PendingAction>());
-  const pendingExecsRef = useRef<PendingExec[]>([]);
-  const { ref, write } = useTerminal();
-  const connectionKey = 0;
-  const [status, setStatus] = useState<"connecting" | "open" | "closed" | "error">("connecting");
-
-  const rejectPendingWork = useEffectEvent((error: Error) => {
-    const pendingActions = [...pendingActionsRef.current.values()];
-    pendingActionsRef.current.clear();
-    for (const pendingAction of pendingActions) {
-      pendingAction.reject(error);
-    }
-
-    const pendingExecs = pendingExecsRef.current.splice(0);
-    for (const pendingExec of pendingExecs) {
-      pendingExec.reject(error);
-    }
-  });
-
-  const sendMessage = useEffectEvent((message: PaneClientMessage) => {
-    const socket = socketRef.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      throw new Error(`Pane ${paneName} is not connected`);
-    }
-
-    socket.send(JSON.stringify(message));
-  });
-
-  const sendAction = useEffectEvent((message: AwaitedPaneActionMessage) => {
-    return new Promise<void>((resolve, reject) => {
-      const id = `${paneName}:${actionIdRef.current++}`;
-      pendingActionsRef.current.set(id, { resolve, reject });
-
-      try {
-        sendMessage({ ...message, id, pane: paneName } as PaneClientMessage);
-      } catch (error) {
-        pendingActionsRef.current.delete(id);
-        reject(error instanceof Error ? error : new Error("Failed to send pane action"));
-      }
-    });
-  });
-
-  const sendLatestResize = useEffectEvent(() => {
-    const latestResize = latestResizeRef.current;
-    if (!latestResize) {
+  switch (message.state) {
+    case "ready":
+      markRecordingReady(true);
+      markRecordingDone(false);
+      markRecordingError(undefined);
       return;
-    }
-
-    sendMessage({
-      type: "pane.resize",
-      pane: paneName,
-      cols: latestResize.cols,
-      rows: latestResize.rows,
-    });
-  });
-
-  const exec = useEffectEvent((command: string, options?: { typeDelayMs?: number }) => {
-    return new Promise<ExecResult>((resolve, reject) => {
-      pendingExecsRef.current.push({ resolve, reject });
-
-      try {
-        sendMessage({
-          type: "pane.exec",
-          pane: paneName,
-          command,
-          typeDelayMs: options?.typeDelayMs,
-        });
-      } catch (error) {
-        pendingExecsRef.current.pop();
-        reject(error instanceof Error ? error : new Error("Failed to send pane.exec"));
-      }
-    });
-  });
-
-  const press = useEffectEvent((key: PressKey) => {
-    return sendAction({
-      type: "pane.press",
-      key,
-    });
-  });
-
-  const requestResize = useEffectEvent((cols: number, rows: number) => {
-    latestResizeRef.current = { cols, rows };
-
-    try {
-      sendLatestResize();
-    } catch {}
-  });
-
-  const type = useEffectEvent((text: string, options?: TypeOptions) => {
-    return sendAction({
-      type: "pane.type",
-      text,
-      typeDelayMs: options?.typeDelayMs,
-    });
-  });
-
-  const handleServerMessage = useEffectEvent((raw: string) => {
-    const message = parsePaneServerMessage(raw);
-    if (!message || message.pane !== paneName) {
+    case "started":
+      markRecordingStarted(message.action);
       return;
-    }
-
-    switch (message.type) {
-      case "pane.meta":
-        sendLatestResize();
-        setStatus("open");
-        return;
-      case "pane.output":
-        write(message.data);
-        setStatus((currentStatus) => (currentStatus === "error" ? currentStatus : "open"));
-        return;
-      case "pane.action.completed":
-        pendingActionsRef.current.get(message.id)?.resolve();
-        pendingActionsRef.current.delete(message.id);
-        return;
-      case "pane.exec.completed":
-        pendingExecsRef.current.shift()?.resolve(message.result);
-        return;
-      case "pane.exit":
-        setStatus("closed");
-        write(
-          `\r\n\x1b[33m[pane exited: code=${message.exitCode ?? "null"}, signal=${message.signal ?? "null"}]\x1b[0m\r\n`,
-        );
-        rejectPendingWork(new Error(`Pane ${paneName} exited`));
-        return;
-      case "pane.error":
-        setStatus("error");
-        write(`\r\n\x1b[31m[pane error] ${message.message}\x1b[0m\r\n`);
-        rejectPendingWork(new Error(message.message));
-        return;
-      default:
-        return;
-    }
-  });
-
-  useEffect(() => {
-    setStatus("connecting");
-
-    const socket = new WebSocket(socketUrlForPane(paneName));
-    socketRef.current = socket;
-
-    socket.onmessage = (event) => {
-      if (typeof event.data === "string") {
-        handleServerMessage(event.data);
-      }
-    };
-
-    socket.onerror = () => {
-      setStatus("error");
-    };
-
-    socket.onclose = () => {
-      if (socketRef.current === socket) {
-        socketRef.current = null;
-      }
-
-      rejectPendingWork(new Error(`Pane ${paneName} disconnected`));
-      setStatus((currentStatus) => (currentStatus === "error" ? "error" : "closed"));
-    };
-
-    return () => {
-      if (socketRef.current === socket) {
-        socketRef.current = null;
-      }
-
-      rejectPendingWork(new Error(`Pane ${paneName} disconnected`));
-      socket.close();
-    };
-  }, [paneName]);
-
-  return {
-    connectionKey,
-    exec,
-    press,
-    ref,
-    requestResize,
-    status,
-    type,
-    write,
-  };
-}
-
-export function createPlaybookApi(
-  runtimes: Map<string, ReadyPaneRuntime>,
-  waitForPlaybookActive: () => Promise<void>,
-  setCurrentPaneName: (name: string) => void,
-  defaultTypeDelayMs: number = typingDelays.WPM_60,
-) {
-  const withDefaultTypeDelay = (options?: TypeOptions) => ({
-    ...options,
-    typeDelayMs: options?.typeDelayMs ?? defaultTypeDelayMs,
-  });
-
-  return {
-    async wait(delayMs: number) {
-      await runPaneAction(`wait(${delayMs})`, async () => {
-        await waitForPlaybookDelay(delayMs, waitForPlaybookActive);
-      });
-    },
-    pane(name: string): PaneController {
-      const runtime = runtimes.get(name);
-      if (!runtime?.ready) {
-        throw new Error(`Pane "${name}" is not ready`);
-      }
-
-      return {
-        async exec(command, options) {
-          await waitForPlaybookActive();
-          setCurrentPaneName(name);
-          return runPaneAction(
-            `pane(${JSON.stringify(name)}).exec(${JSON.stringify(command)})`,
-            async () => {
-              const result = await runtime.exec(command, withDefaultTypeDelay(options));
-              await waitForPlaybookActive();
-              return result;
-            },
-          );
-        },
-        async press(key) {
-          await waitForPlaybookActive();
-          setCurrentPaneName(name);
-          await runPaneAction(
-            `pane(${JSON.stringify(name)}).press(${JSON.stringify(key)})`,
-            async () => {
-              await runtime.press(key);
-              await waitForPlaybookActive();
-            },
-          );
-        },
-        async type(text, options) {
-          await waitForPlaybookActive();
-          setCurrentPaneName(name);
-          await runPaneAction(
-            `pane(${JSON.stringify(name)}).type(${summarizeText(text)})`,
-            async () => {
-              await runtime.type(text, withDefaultTypeDelay(options));
-              await waitForPlaybookActive();
-            },
-          );
-        },
-      };
-    },
-  };
-}
-
-async function runPaneAction<T>(label: string, action: () => Promise<T>) {
-  markRecordingAction(label);
-
-  try {
-    return await action();
-  } finally {
-    markRecordingAction(undefined);
+    case "done":
+      markRecordingDone(true);
+      return;
+    case "error":
+      markRecordingError(message.error ?? "Recording failed");
+      return;
+    default:
+      message.state satisfies never;
   }
-}
-
-function socketUrlForPane(paneName: string) {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const bridgeToken = getBridgeToken();
-  return `${protocol}//${window.location.host}/panes/${paneName}?token=${encodeURIComponent(bridgeToken)}`;
-}
-
-function getBridgeToken() {
-  const token = document
-    .querySelector('meta[name="termdem-bridge-token"]')
-    ?.getAttribute("content");
-  if (!token) {
-    throw new Error("Missing termdem bridge token");
-  }
-
-  return token;
-}
-
-function PreviewOverlay({
-  mode,
-  onHide,
-  onRestart,
-  onResume,
-  onStop,
-}: {
-  mode: PreviewMode;
-  onHide: () => void;
-  onRestart: () => void;
-  onResume: () => void;
-  onStop: () => void;
-}) {
-  return (
-    <div className="fixed right-3 top-3 z-50 flex items-center gap-2 border border-cyan-300/30 bg-black/80 px-2 py-1 font-mono text-[11px] text-slate-200 shadow-xl shadow-black/30 backdrop-blur">
-      <span className="text-cyan-300">termdem</span>
-      <span className={mode === "running" ? "text-emerald-300" : "text-amber-200"}>{mode}</span>
-      {mode === "running" ? (
-        <button className="text-slate-300 hover:text-white" type="button" onClick={onStop}>
-          stop
-        </button>
-      ) : (
-        <button className="text-slate-300 hover:text-white" type="button" onClick={onResume}>
-          resume
-        </button>
-      )}
-      <button className="text-slate-300 hover:text-white" type="button" onClick={onRestart}>
-        restart
-      </button>
-      <button className="text-slate-500 hover:text-white" type="button" onClick={onHide}>
-        hide
-      </button>
-    </div>
-  );
-}
-
-function useInitialValue<T>(createValue: () => T) {
-  const valueRef = useRef<{ value: T } | null>(null);
-  if (!valueRef.current) {
-    valueRef.current = { value: createValue() };
-  }
-
-  return valueRef.current.value;
-}
-
-function readInitialPreviewMode(): PreviewMode {
-  if (globalThis.location?.search) {
-    const params = new URLSearchParams(globalThis.location.search);
-    if (params.get("termdem_autostart") === "0") {
-      return "stopped";
-    }
-  }
-
-  return "running";
 }
 
 function markRecordingReady(ready: boolean) {
@@ -792,24 +409,14 @@ function markRecordingReady(ready: boolean) {
   };
 }
 
-function markRecordingStarted() {
-  globalThis.__termdem = {
-    ...globalThis.__termdem,
-    recording: {
-      ...globalThis.__termdem?.recording,
-      action: undefined,
-      done: false,
-      error: undefined,
-    },
-  };
-}
-
-function markRecordingAction(action: string | undefined) {
+function markRecordingStarted(action?: string) {
   globalThis.__termdem = {
     ...globalThis.__termdem,
     recording: {
       ...globalThis.__termdem?.recording,
       action,
+      done: false,
+      error: undefined,
     },
   };
 }
@@ -819,8 +426,8 @@ function markRecordingDone(done: boolean) {
     ...globalThis.__termdem,
     recording: {
       ...globalThis.__termdem?.recording,
+      action: undefined,
       done,
-      error: done ? undefined : globalThis.__termdem?.recording?.error,
     },
   };
 }
@@ -835,24 +442,41 @@ function markRecordingError(error: string | undefined) {
   };
 }
 
-function formatError(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
+function paneNameFromAction(action: string | undefined) {
+  if (!action) {
+    return null;
   }
 
-  return String(error);
+  const match = /^pane\("([^"]+)"\)\./u.exec(action);
+  return match?.[1] ?? null;
 }
 
-function summarizeText(text: string) {
-  const normalized = JSON.stringify(text.length > 48 ? `${text.slice(0, 45)}...` : text);
-  return normalized.replaceAll("\\n", "\\\\n");
+function useInitialValue<T>(factory: () => T) {
+  const ref = useRef<{ value: T } | null>(null);
+  if (!ref.current) {
+    ref.current = { value: factory() };
+  }
+
+  return ref.current.value;
+}
+
+function usePreviewSocket() {
+  const context = useContext(PreviewSocketContext);
+  if (!context) {
+    throw new Error("Missing preview socket context");
+  }
+
+  return context;
 }
 
 declare global {
+  // eslint-disable-next-line no-var
   var __termdem:
     | {
         controls?: {
+          restart?: () => void;
           start?: () => void;
+          stop?: () => void;
         };
         recording?: {
           action?: string;

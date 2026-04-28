@@ -33,7 +33,7 @@
   "scripts": {
     "build": "vp pack",
     "dev": "vp pack --watch",
-    "test": "vp test",
+    "test": "vp test run --tagsFilter '!smoke'",
     "check": "vp check",
     "prepublishOnly": "vp run build"
   },

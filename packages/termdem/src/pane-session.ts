@@ -11,6 +11,7 @@ export type PaneSessionOptions = {
   cols?: number;
   rows?: number;
   prompt?: string;
+  setupCommands?: readonly string[];
   onOutput?: (chunk: string) => void;
 };
 
@@ -23,6 +24,7 @@ type PendingExec = {
   command: string;
   startedAt: number;
   rawChunks: string[];
+  visible: boolean;
   resolve: (result: ExecResult) => void;
   reject: (error: Error) => void;
 };
@@ -64,7 +66,7 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
   });
 
   const session = new NodePtyPaneSession(pty, prompt, options.onOutput);
-  await session.bootstrap();
+  await session.bootstrap(options.setupCommands ?? []);
   return session;
 }
 
@@ -93,11 +95,18 @@ class NodePtyPaneSession implements PaneSession {
     });
   }
 
-  async bootstrap() {
+  async bootstrap(setupCommands: readonly string[]) {
     await this.waitForPrompt();
     this.pty.write("stty -echo\r");
     this.dataBuffer = "";
     await this.waitForPrompt();
+
+    for (const command of setupCommands) {
+      this.pty.write(`${command}\r`);
+      this.dataBuffer = "";
+      await this.waitForPrompt();
+    }
+
     this.bootstrapping = false;
     this.dataBuffer = "";
   }
@@ -119,7 +128,7 @@ class NodePtyPaneSession implements PaneSession {
 
   async exec(command: string, options: ExecOptions = {}) {
     return this.enqueue(async () => {
-      const pending = await this.beginExec(command);
+      const pending = await this.beginExec(command, { visible: true });
       await this.performType(command, { typeDelayMs: options.typeDelayMs });
       this.emitInputVisible("\r\n");
       this.pty.write("\x15");
@@ -135,16 +144,26 @@ class NodePtyPaneSession implements PaneSession {
     });
   }
 
+  async sendLine(command: string, options: TypeOptions = {}) {
+    await this.enqueue(async () => {
+      await this.performType(command, options);
+      this.emitInputVisible("\r\n");
+      this.pty.write("\r");
+    });
+  }
+
   async close() {
     this.closed = true;
     this.outputListener.dispose();
-    this.pendingExec?.reject(new Error("Pane session closed"));
+    const closeError = new Error("Pane session closed");
+    this.pendingExec?.reject(closeError);
     this.pendingExec = null;
     if (this.completedExec) {
       clearTimeout(this.completedExec.timer);
-      this.completedExec.reject(new Error("Pane session closed"));
+      this.completedExec.reject(closeError);
       this.completedExec = null;
     }
+    this.actionQueue.catch(() => {});
     this.pty.kill();
   }
 
@@ -156,7 +175,7 @@ class NodePtyPaneSession implements PaneSession {
     }
   }
 
-  private async beginExec(command: string) {
+  private async beginExec(command: string, options: { visible: boolean }) {
     if (this.pendingExec) {
       throw new Error("exec already in progress");
     }
@@ -167,16 +186,24 @@ class NodePtyPaneSession implements PaneSession {
         command,
         startedAt: Date.now(),
         rawChunks: [],
+        visible: options.visible,
         resolve,
         reject,
       };
     });
+    result.catch(() => {});
 
     return { id, result };
   }
 
   private enqueue<T>(task: () => Promise<T>) {
-    const run = this.actionQueue.then(task);
+    const run = this.actionQueue.then(async () => {
+      if (this.closed) {
+        throw new Error("Pane session closed");
+      }
+
+      return task();
+    });
     this.actionQueue = run.then(
       () => undefined,
       () => undefined,
@@ -232,7 +259,9 @@ class NodePtyPaneSession implements PaneSession {
     }
 
     this.alternateScreenActive = nextAlternateScreenState(this.alternateScreenActive, text);
-    this.emitVisible(text);
+    if (this.pendingExec?.visible !== false) {
+      this.emitVisible(text);
+    }
     if (this.captureActive) {
       this.pendingExec?.rawChunks.push(text);
     }

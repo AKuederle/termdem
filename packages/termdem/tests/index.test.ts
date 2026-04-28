@@ -148,6 +148,35 @@ test("pane sessions can chain exec results from ls into cat", async () => {
   }
 });
 
+test("pane sessions run setup commands before visible actions", async () => {
+  const visibleOutput: string[] = [];
+  const session = await createPaneSession({
+    setupCommands: ["alias hello='printf setup-ok'"],
+    onOutput(chunk) {
+      visibleOutput.push(chunk);
+    },
+  });
+
+  try {
+    const result = await session.exec("hello", { typeDelayMs: 0 });
+
+    expect(result.text).toBe("setup-ok");
+    expect(visibleOutput.join("")).toContain("hello");
+    expect(visibleOutput.join("")).not.toContain("alias hello");
+  } finally {
+    await session.close();
+  }
+});
+
+test("pane sessions reject pending exec work when closed", async () => {
+  const session = await createPaneSession();
+  const pendingExec = session.exec("sleep 30", { typeDelayMs: 0 });
+
+  await session.close();
+
+  await expect(pendingExec).rejects.toThrow("Pane session closed");
+});
+
 test("pane sessions disable pagers so exec commands can complete in a tty", async () => {
   const cwd = await createTempDir();
   const pagerPath = join(cwd, "blocking-pager.sh");

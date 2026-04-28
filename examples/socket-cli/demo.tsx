@@ -7,7 +7,8 @@ import {
   type TerminalPaneComponents,
 } from "@akuederle/termdem";
 
-const workspace = new Dir(() => decodeURIComponent(new URL(".", import.meta.url).pathname));
+const workspacePath = decodeURIComponent(new URL(".", import.meta.url).pathname);
+const workspace = new Dir(() => workspacePath);
 
 const demo = createTerminalDemo(
   [
@@ -35,8 +36,16 @@ const demo = createTerminalDemo(
     const setup = await server.exec("node scripts/server.mjs setup");
     const url = parseChatUrl(setup.text);
 
-    await listener.type(`node scripts/client.mjs listen ${quoteShellArg(url)}`);
-    await listener.press("Enter");
+    await listener.sendLine(`node scripts/client.mjs listen ${quoteShellArg(url)}`);
+    await api.waitFor("listener ready", async () => {
+      const result = await api.node.execFile("node", ["scripts/server.mjs", "health", url], {
+        cwd: workspacePath,
+        reject: false,
+        timeoutMs: 1_000,
+      });
+
+      return result.exitCode === 0 && result.stdout.includes("listener ready");
+    });
 
     await sender.exec(
       `node scripts/client.mjs send ${quoteShellArg(url)} ${quoteShellArg("hello")}`,
