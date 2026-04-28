@@ -7,12 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-04-28
+## [0.0.1] - 2026-04-28
 
 ### Added
 
 - Initial public npm release of `@akuederle/termdem`.
 - Added terminal demo scripting, preview, recording, and multi-pane rendering support.
 
-[unreleased]: https://github.com/AKuederle/termdem/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/AKuederle/termdem/releases/tag/v0.1.0
+[unreleased]: https://github.com/AKuederle/termdem/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/AKuederle/termdem/releases/tag/v0.0.1
