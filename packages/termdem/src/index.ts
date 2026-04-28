@@ -12,7 +12,6 @@ export {
   type TmpDirOptions,
   type TmpDirSetup,
 } from "./workspace.ts";
-export { Pane, Stage } from "./scene.ts";
 export {
   createTerminalDemo,
   type TerminalDefinition,
@@ -21,7 +20,5 @@ export {
   type TerminalPaneComponents,
   type TerminalPaneProps,
   type TerminalDemoScriptApi,
-  type TerminalHandle,
-  type TerminalHandles,
 } from "./terminal-demo.ts";
 export type { ExecOptions, ExecResult, PaneController, PressKey, TypeOptions } from "./types.ts";

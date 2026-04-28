@@ -567,9 +567,7 @@ renderPreviewApp({ render, script: demo.script, terminalDefinitions: demo.termin
 }
 
 export function clientShimSource() {
-  return `export { Pane, Stage, collectPaneDefinitions, renderStageScene } from "@akuederle/termdem/scene";
-
-export const keys = {
+  return `export const keys = {
   ARROW_DOWN: "\\x1b[B",
   ARROW_LEFT: "\\x1b[D",
   ARROW_RIGHT: "\\x1b[C",

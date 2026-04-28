@@ -65,10 +65,13 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   );
   const initialPreviewMode = useInitialValue(() => readInitialPreviewMode());
   const paneRuntimesRef = useRef(new Map<string, PaneRuntime>());
+  const paneMountCountsRef = useRef(new Map<string, number>());
   const playbookRunIdRef = useRef(0);
   const previewModeRef = useRef<PreviewMode>(initialPreviewMode);
   const resumeWaitersRef = useRef<Array<() => void>>([]);
   const runningPlaybookKeyRef = useRef<string | null>(null);
+  const [paneMountError, setPaneMountError] = useState<string | null>(null);
+  const [paneMountVersion, setPaneMountVersion] = useState(0);
   const [overlayVisible, setOverlayVisible] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>(initialPreviewMode);
   const [runtimeVersion, setRuntimeVersion] = useState(0);
@@ -102,9 +105,21 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
     setRuntimeVersion((version) => version + 1);
   });
 
+  const onPaneMountChange = useEffectEvent((name: string, delta: number) => {
+    const counts = paneMountCountsRef.current;
+    const nextCount = (counts.get(name) ?? 0) + delta;
+    if (nextCount <= 0) {
+      counts.delete(name);
+    } else {
+      counts.set(name, nextCount);
+    }
+
+    setPaneMountVersion((version) => version + 1);
+  });
+
   const paneComponents = useMemo(
-    () => createPaneComponents(paneNames, sessionKey, onRuntimeChange),
-    [onRuntimeChange, paneNames, sessionKey],
+    () => createPaneComponents(paneNames, sessionKey, onPaneMountChange, onRuntimeChange),
+    [onPaneMountChange, onRuntimeChange, paneNames, sessionKey],
   );
 
   const resumePlaybook = useEffectEvent(() => {
@@ -202,10 +217,35 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
 
   useEffect(() => {
     const runtimes = paneRuntimesRef.current;
+    if (paneMountError) {
+      markRecordingReady(false);
+      return;
+    }
+
     markRecordingReady(paneNames.every((name) => runtimes.get(name)?.ready));
-  }, [paneNames, runtimeVersion]);
+  }, [paneMountError, paneNames, runtimeVersion]);
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const nextError = paneMountErrorFromCounts(paneNames, paneMountCountsRef.current);
+      setPaneMountError(nextError);
+
+      if (nextError) {
+        markRecordingReady(false);
+        markRecordingError(nextError);
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [paneMountVersion, paneNames, sessionKey]);
+
+  useEffect(() => {
+    if (paneMountError) {
+      return;
+    }
+
     if (previewMode !== "running") {
       return;
     }
@@ -222,7 +262,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
 
     runningPlaybookKeyRef.current = playbookKey;
     void runPlaybook(playbookRunIdRef.current);
-  }, [paneNames, previewMode, runPlaybook, runtimeVersion]);
+  }, [paneMountError, paneNames, previewMode, runPlaybook, runtimeVersion]);
 
   return (
     <>
@@ -267,16 +307,26 @@ function paneNamesFromTerminalDefinitions(terminalDefinitions: readonly { name: 
 function PaneTerminalCard({
   className,
   name,
+  onMountChange,
   onRuntimeChange,
   style,
 }: {
   className?: string;
   name: string;
+  onMountChange: (name: string, delta: number) => void;
   onRuntimeChange: (name: string, runtime: PaneRuntime) => void;
   style?: TerminalPaneProps["style"];
 }) {
   const { connectionKey, exec, press, ref, requestResize, status, type, write } =
     usePaneConnection(name);
+
+  useEffect(() => {
+    onMountChange(name, 1);
+
+    return () => {
+      onMountChange(name, -1);
+    };
+  }, [name, onMountChange]);
 
   useEffect(() => {
     onRuntimeChange(name, {
@@ -316,6 +366,7 @@ function PaneTerminalCard({
 function createPaneComponents(
   paneNames: string[],
   sessionKey: number,
+  onMountChange: (name: string, delta: number) => void,
   onRuntimeChange: (name: string, runtime: PaneRuntime) => void,
 ) {
   const panes = Object.fromEntries(
@@ -326,6 +377,7 @@ function createPaneComponents(
             key={`${sessionKey}:${name}`}
             className={className}
             name={name}
+            onMountChange={onMountChange}
             onRuntimeChange={onRuntimeChange}
             style={style}
           />
@@ -338,6 +390,20 @@ function createPaneComponents(
   );
 
   return panes as Record<string, TerminalPaneComponent>;
+}
+
+function paneMountErrorFromCounts(paneNames: string[], counts: Map<string, number>) {
+  const missingPaneNames = paneNames.filter((name) => !counts.has(name));
+  if (missingPaneNames.length > 0) {
+    return `Missing rendered pane component${missingPaneNames.length === 1 ? "" : "s"}: ${missingPaneNames.join(", ")}`;
+  }
+
+  const duplicatePaneNames = paneNames.filter((name) => (counts.get(name) ?? 0) > 1);
+  if (duplicatePaneNames.length > 0) {
+    return `Pane component rendered more than once: ${duplicatePaneNames.join(", ")}`;
+  }
+
+  return null;
 }
 
 function usePaneConnection(paneName: string) {

@@ -36,8 +36,10 @@ export function Stage({ children }: StageProps) {
   return children ?? null;
 }
 
-export function Pane(_props: PaneProps) {
-  return null;
+export function Pane(_props: PaneProps): never {
+  throw new Error(
+    "Pane is no longer rendered directly. Use the pane components passed to render(panes) instead.",
+  );
 }
 
 export function collectPaneDefinitions(scene: ReactNode) {
