@@ -119,7 +119,7 @@ class NodePtyPaneSession implements PaneSession {
   async exec(command: string, options: ExecOptions = {}) {
     return this.enqueue(async () => {
       const pending = await this.beginExec(command);
-      await this.performType(command, { delayMs: options.typeDelayMs });
+      await this.performType(command, { typeDelayMs: options.typeDelayMs });
       this.emitInputVisible("\r\n");
       this.pty.write("\x15");
       this.pty.write(buildExecShellCommand(command, pending.id));
@@ -151,7 +151,7 @@ class NodePtyPaneSession implements PaneSession {
     for (const char of text) {
       this.emitInputVisible(char);
       this.pty.write(char);
-      await sleep(options.delayMs ?? 0);
+      await sleep(options.typeDelayMs ?? 0);
     }
   }
 

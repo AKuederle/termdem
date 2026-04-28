@@ -1,7 +1,7 @@
 export type PressKey = "Enter" | "\r";
 
 export type TypeOptions = {
-  delayMs?: number;
+  typeDelayMs?: number;
 };
 
 export type ExecOptions = {

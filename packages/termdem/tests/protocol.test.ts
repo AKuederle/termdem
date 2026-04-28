@@ -26,7 +26,7 @@ test("parsePaneClientMessage accepts action ids for ordered keystrokes", () => {
       id: "action-1",
       pane: "main",
       text: "vim README.md",
-      delayMs: 20,
+      typeDelayMs: 20,
     }),
   );
 
@@ -35,7 +35,7 @@ test("parsePaneClientMessage accepts action ids for ordered keystrokes", () => {
     id: "action-1",
     pane: "main",
     text: "vim README.md",
-    delayMs: 20,
+    typeDelayMs: 20,
   });
 });
 

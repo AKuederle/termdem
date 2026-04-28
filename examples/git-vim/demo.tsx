@@ -23,23 +23,25 @@ const demo = createTerminalDemo(
       typeDelayMs: 12,
     });
 
-    await git.type(`${VIM} README.md`, { delayMs: 24 });
+    await git.type(`${VIM} README.md`, { typeDelayMs: 24 });
     await git.press(keys.ENTER);
     await api.wait(600);
-    await git.type("i# termdem git demo\n\nCreated from raw Vim keystrokes.\n", { delayMs: 18 });
+    await git.type("i# termdem git demo\n\nCreated from raw Vim keystrokes.\n", {
+      typeDelayMs: 18,
+    });
     await git.type(keys.ESC);
     await api.wait(100);
-    await git.type(":wq", { delayMs: 28 });
+    await git.type(":wq", { typeDelayMs: 28 });
     await git.press(keys.ENTER);
     await api.wait(600);
 
-    await git.type(`${VIM} README.md`, { delayMs: 24 });
+    await git.type(`${VIM} README.md`, { typeDelayMs: 24 });
     await git.press(keys.ENTER);
     await api.wait(600);
-    await git.type("Go\nEdited in a second Vim session.\n", { delayMs: 18 });
+    await git.type("Go\nEdited in a second Vim session.\n", { typeDelayMs: 18 });
     await git.type(keys.ESC);
     await api.wait(100);
-    await git.type(":wq", { delayMs: 28 });
+    await git.type(":wq", { typeDelayMs: 28 });
     await git.press(keys.ENTER);
     await api.wait(600);
 

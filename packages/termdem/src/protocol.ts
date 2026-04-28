@@ -20,7 +20,7 @@ export type PaneTypeMessage = {
   id?: string;
   pane: string;
   text: string;
-  delayMs?: number;
+  typeDelayMs?: number;
 };
 
 export type PanePressMessage = {
@@ -127,7 +127,7 @@ export function parsePaneClientMessage(raw: string): PaneClientMessage | null {
       if (typeof payload.text !== "string") {
         return null;
       }
-      if (payload.delayMs !== undefined && typeof payload.delayMs !== "number") {
+      if (payload.typeDelayMs !== undefined && typeof payload.typeDelayMs !== "number") {
         return null;
       }
       return {
@@ -135,7 +135,7 @@ export function parsePaneClientMessage(raw: string): PaneClientMessage | null {
         id: optionalString(payload.id),
         pane: payload.pane,
         text: payload.text,
-        delayMs: payload.delayMs,
+        typeDelayMs: payload.typeDelayMs,
       };
     case "pane.press":
       if (payload.key !== "Enter" && payload.key !== "\r") {

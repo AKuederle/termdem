@@ -334,7 +334,7 @@ async function handlePaneClientMessage(
       await session.resize(parsed.cols, parsed.rows);
       return;
     case "pane.type":
-      await session.type(parsed.text, { delayMs: parsed.delayMs });
+      await session.type(parsed.text, { typeDelayMs: parsed.typeDelayMs });
       return;
     case "pane.press":
       await session.press(parsed.key);

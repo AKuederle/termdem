@@ -42,7 +42,7 @@ type AwaitedPaneActionMessage =
   | {
       type: "pane.type";
       text: string;
-      delayMs?: number;
+      typeDelayMs?: number;
     };
 
 const paneFrameClassName =
@@ -508,7 +508,7 @@ function usePaneConnection(paneName: string) {
     return sendAction({
       type: "pane.type",
       text,
-      delayMs: options?.delayMs,
+      typeDelayMs: options?.typeDelayMs,
     });
   });
 

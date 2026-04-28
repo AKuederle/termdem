@@ -34,7 +34,9 @@ const demo = createTerminalDemo(
     const setup = await server.exec("node scripts/server.mjs setup", { typeDelayMs: 22 });
     const url = parseChatUrl(setup.text);
 
-    await listener.type(`node scripts/client.mjs listen ${quoteShellArg(url)}`, { delayMs: 18 });
+    await listener.type(`node scripts/client.mjs listen ${quoteShellArg(url)}`, {
+      typeDelayMs: 18,
+    });
     await listener.press("Enter");
 
     await sender.exec(
