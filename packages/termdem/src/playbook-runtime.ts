@@ -328,6 +328,11 @@ export class PlaybookRuntime<Name extends string = string> {
         controllerOptions.defaultTypeDelayMs ??
         this.options.typeDelayMs ??
         defaultTypeDelayMs,
+      waitForActive: () => this.ensureActive(generation),
+    });
+    const withExecCheckpoint = (inputOptions?: ExecOptions) => ({
+      ...withDefaultTypeDelay(inputOptions),
+      waitForActive: () => this.ensureActive(generation),
     });
 
     return {
@@ -340,7 +345,7 @@ export class PlaybookRuntime<Name extends string = string> {
         if (controllerOptions.hiddenPaneExec) {
           return this.readyPane(name).execHidden(command);
         }
-        return this.readyPane(name).exec(command, withDefaultTypeDelay(options));
+        return this.readyPane(name).exec(command, withExecCheckpoint(options));
       },
       press: async (key: PressKey): Promise<void> => {
         await this.ensureActive(generation, actionName("press"));

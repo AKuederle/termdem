@@ -267,6 +267,39 @@ test("playbook runtime stop cancels a paused run", async () => {
   expect(states).not.toContain("done");
 });
 
+test("playbook runtime pause can stop and resume visible typing mid-action", async () => {
+  const visibleOutput: string[] = [];
+  const states: string[] = [];
+  const runtime = new PlaybookRuntime({
+    onPaneOutput(message) {
+      visibleOutput.push(message.data);
+    },
+    onPlaybookState(state) {
+      states.push(state.state);
+    },
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
+    typeDelayMs: 20,
+  });
+
+  const run = runtime.run(async (api) => {
+    await api.pane("main").type("abcdef");
+  });
+
+  await waitFor(() => visibleOutput.join("").includes("a"));
+  runtime.pause();
+  const pausedTranscript = visibleOutput.join("");
+  await sleep(100);
+
+  expect(visibleOutput.join("")).toBe(pausedTranscript);
+  expect(states).toContain("paused");
+
+  runtime.resume();
+  await run;
+
+  expect(visibleOutput.join("")).toContain("abcdef");
+  expect(states.at(-1)).toBe("done");
+});
+
 test("playbook runtime ignores overlapping start requests", async () => {
   const runtime = new PlaybookRuntime({
     terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],

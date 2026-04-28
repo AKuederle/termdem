@@ -40,6 +40,14 @@ type CompletedExecState = {
   visible: boolean;
 };
 
+type PaneSessionTypeOptions = TypeOptions & {
+  waitForActive?: () => Promise<void>;
+};
+
+type PaneSessionExecOptions = ExecOptions & {
+  waitForActive?: () => Promise<void>;
+};
+
 const defaultPrompt = "TERMDEM> ";
 
 export async function createPaneSession(options: PaneSessionOptions = {}): Promise<PaneSession> {
@@ -157,7 +165,7 @@ class NodePtyPaneSession implements PaneSession {
     return this.enqueue(async () => this.currentCwd);
   }
 
-  async type(text: string, options: TypeOptions = {}) {
+  async type(text: string, options: PaneSessionTypeOptions = {}) {
     await this.enqueue(() => this.performType(text, options));
   }
 
@@ -169,10 +177,14 @@ class NodePtyPaneSession implements PaneSession {
     });
   }
 
-  async exec(command: string, options: ExecOptions = {}) {
+  async exec(command: string, options: PaneSessionExecOptions = {}) {
     return this.enqueue(async () => {
       const pending = await this.beginExec(command, { visible: true });
-      await this.performType(command, { typeDelayMs: options.typeDelayMs });
+      await this.performType(command, {
+        typeDelayMs: options.typeDelayMs,
+        waitForActive: options.waitForActive,
+      });
+      await options.waitForActive?.();
       this.emitInputVisible("\r\n");
       this.pty.write("\x15");
       this.pty.write(buildExecShellCommand(command, pending.id));
@@ -190,7 +202,7 @@ class NodePtyPaneSession implements PaneSession {
     });
   }
 
-  async typeHidden(text: string, options: TypeOptions = {}) {
+  async typeHidden(text: string, options: PaneSessionTypeOptions = {}) {
     await this.enqueue(() => this.performTypeHidden(text, options));
   }
 
@@ -208,9 +220,10 @@ class NodePtyPaneSession implements PaneSession {
     });
   }
 
-  async sendLine(command: string, options: TypeOptions = {}) {
+  async sendLine(command: string, options: PaneSessionTypeOptions = {}) {
     await this.enqueue(async () => {
       await this.performType(command, options);
+      await options.waitForActive?.();
       this.emitInputVisible("\r\n");
       this.pty.write("\r");
     });
@@ -238,18 +251,20 @@ class NodePtyPaneSession implements PaneSession {
     this.pty.kill();
   }
 
-  private async performType(text: string, options: TypeOptions = {}) {
+  private async performType(text: string, options: PaneSessionTypeOptions = {}) {
     for (const char of text) {
+      await options.waitForActive?.();
       this.emitInputVisible(char);
       this.pty.write(char);
       await sleep(options.typeDelayMs ?? typingDelays.WPM_60);
     }
   }
 
-  private async performTypeHidden(text: string, options: TypeOptions = {}) {
+  private async performTypeHidden(text: string, options: PaneSessionTypeOptions = {}) {
     this.hideOutputUntilPrompts(countPromptProducingControls(text));
 
     for (const char of text) {
+      await options.waitForActive?.();
       this.pty.write(char);
       await sleep(options.typeDelayMs ?? typingDelays.WPM_60);
     }
