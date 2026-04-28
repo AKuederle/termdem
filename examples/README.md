@@ -13,7 +13,7 @@ Recording size defaults live in each demo's `createTerminalDemo({ settings })` c
 `record` CLI supports `--size <width>x<height>` for the output video size and
 `--viewportSize <width>x<height>` when the browser viewport should differ from the recorded video.
 If only `--size` is passed, it applies to both recording and viewport size.
-Recording uses ffmpeg for pre-roll trimming and final sizing, so `ffmpeg` must be available on `PATH`.
+WebM recording does not require ffmpeg. MP4 output requires `ffmpeg` on `PATH`.
 
 From an example package, the intended workflow is:
 

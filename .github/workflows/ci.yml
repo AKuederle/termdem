@@ -17,13 +17,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install native build dependencies
+        run: apt-get update && apt-get install -y build-essential
+
       - name: Set up Vite+
         uses: voidzero-dev/setup-vp@v1
         with:
+          node-version: "22"
           cache: true
 
-      - name: Install ffmpeg
-        run: apt-get update && apt-get install -y ffmpeg
+      - name: Build package for example typechecking
+        run: vp run @akuederle/termdem#build
 
       - name: Check
         run: vp check

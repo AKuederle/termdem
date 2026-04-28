@@ -36,7 +36,7 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
     const context = await browser.newContext({
       recordVideo: {
         dir: tempDir,
-        size: options.viewportSize,
+        size: options.size,
       },
       viewport: options.viewportSize,
     });
@@ -65,9 +65,7 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
     if (
       videoNeedsTranscode({
         format,
-        size: options.size,
         trimStartSeconds,
-        viewportSize: options.viewportSize,
       })
     ) {
       options.onProgress?.("Transcoding recording");
@@ -88,15 +86,9 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
 
 export function videoNeedsTranscode(options: {
   format: RecordingFormat;
-  size: DemoSize;
   trimStartSeconds?: number;
-  viewportSize: DemoSize;
 }) {
-  return (
-    options.format !== "webm" ||
-    !sizesMatch(options.size, options.viewportSize) ||
-    Boolean(options.trimStartSeconds && options.trimStartSeconds > 0)
-  );
+  return options.format !== "webm";
 }
 
 export function sizesMatch(left: DemoSize, right: DemoSize) {
@@ -236,7 +228,7 @@ async function transcodeWebm(
         if ("code" in error && error.code === "ENOENT") {
           reject(
             new Error(
-              "Recording with MP4 output or different viewport/output sizes requires ffmpeg, but ffmpeg was not found on PATH.",
+              "Recording with MP4 output requires ffmpeg, but ffmpeg was not found on PATH.",
             ),
           );
           return;

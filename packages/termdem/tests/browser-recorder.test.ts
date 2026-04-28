@@ -6,20 +6,17 @@ import {
   videoNeedsTranscode,
 } from "../src/browser-recorder.ts";
 
-test("browser recordings use the viewport as the raw Playwright video size", () => {
+test("webm recordings use the raw Playwright video without ffmpeg", () => {
   expect(
     videoNeedsTranscode({
       format: "webm",
-      size: { width: 1920, height: 1080 },
-      viewportSize: { width: 1440, height: 900 },
     }),
-  ).toBe(true);
+  ).toBe(false);
 
   expect(
     videoNeedsTranscode({
       format: "webm",
-      size: { width: 1280, height: 720 },
-      viewportSize: { width: 1280, height: 720 },
+      trimStartSeconds: 0.35,
     }),
   ).toBe(false);
 });
@@ -28,19 +25,6 @@ test("mp4 recordings are transcoded even when dimensions already match", () => {
   expect(
     videoNeedsTranscode({
       format: "mp4",
-      size: { width: 1280, height: 720 },
-      viewportSize: { width: 1280, height: 720 },
-    }),
-  ).toBe(true);
-});
-
-test("recording pre-roll forces transcoding so early blank frames can be trimmed", () => {
-  expect(
-    videoNeedsTranscode({
-      format: "webm",
-      size: { width: 1280, height: 720 },
-      trimStartSeconds: 0.35,
-      viewportSize: { width: 1280, height: 720 },
     }),
   ).toBe(true);
 });
