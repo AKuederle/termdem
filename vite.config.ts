@@ -4,7 +4,9 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {},
+  fmt: {
+    proseWrap: "preserve",
+  },
   lint: { options: { typeAware: true, typeCheck: true } },
   test: {
     tags: [{ name: "smoke" }],
