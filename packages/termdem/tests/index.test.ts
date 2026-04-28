@@ -346,17 +346,18 @@ test("TmpDir instances can be shared by multiple terminal workspaces", async () 
 
 test("Dir owns setup and cleanup for reusable non-temp workspaces", async () => {
   const cleanupDirs: string[] = [];
-  const dir = new Dir(
-    async () => {
-      const path = await createTempDir();
-      await writeFile(join(path, "marker.txt"), "managed\n", "utf8");
-      return path;
+  const path = await createTempDir();
+  const dir = new Dir({
+    path,
+    setup: async (dir) => {
+      expect(dir).toBe(path);
+      await writeFile(join(dir, "marker.txt"), "managed\n", "utf8");
     },
-    async (path) => {
-      cleanupDirs.push(path);
-      await rm(path, { recursive: true, force: true });
+    teardown: async (dir) => {
+      cleanupDirs.push(dir);
+      await rm(dir, { recursive: true, force: true });
     },
-  );
+  });
 
   const first = await createTerminalWorkspace({ name: "A", pwd: dir });
   const second = await createTerminalWorkspace({ name: "B", pwd: dir });
@@ -375,9 +376,15 @@ test("Dir owns setup and cleanup for reusable non-temp workspaces", async () => 
 
 test("terminal cleanup runs before workspace disposal and is idempotent", async () => {
   const cleanupEvents: string[] = [];
-  const tmpDir = new TmpDir(async (dir) => {
-    cleanupPaths.push(dir);
-    await writeFile(join(dir, "marker.txt"), "ready\n", "utf8");
+  const teardownEvents: string[] = [];
+  const tmpDir = new TmpDir({
+    setup: async (dir) => {
+      cleanupPaths.push(dir);
+      await writeFile(join(dir, "marker.txt"), "ready\n", "utf8");
+    },
+    teardown: async (dir) => {
+      teardownEvents.push(await readFile(join(dir, "marker.txt"), "utf8"));
+    },
   });
 
   const workspace = await createTerminalWorkspace({
@@ -392,6 +399,7 @@ test("terminal cleanup runs before workspace disposal and is idempotent", async 
   await workspace.dispose();
 
   expect(cleanupEvents).toEqual(["A:ready\n"]);
+  expect(teardownEvents).toEqual(["ready\n"]);
   expect(await pathExists(workspace.cwd)).toBe(false);
 });
 

@@ -5,19 +5,35 @@ import { join } from "node:path";
 type Awaitable<T> = T | Promise<T>;
 
 /**
- * Creates or returns the directory path used by a reusable workspace.
- *
- * Return an absolute or relative path to an existing directory. The setup function may
- * create the directory before returning it.
+ * Prepares the directory path used by a reusable workspace.
  */
-export type DirSetup = () => Awaitable<string>;
+export type DirSetup = (dir: string) => Awaitable<void>;
 
 /**
- * Cleans up a directory created or selected by {@link DirSetup}.
+ * Tears down a directory prepared by {@link DirSetup}.
  *
- * @param dir - Directory path returned by the matching setup function.
+ * @param dir - Directory path owned by the matching workspace.
  */
-export type DirCleanup = (dir: string) => Awaitable<void>;
+export type DirTeardown = (dir: string) => Awaitable<void>;
+
+/**
+ * Options for {@link Dir}.
+ */
+export type DirOptions = {
+  /**
+   * Directory path used by this workspace.
+   */
+  path: string;
+  /**
+   * Optional setup function called with `path` before the demo uses it.
+   */
+  setup?: DirSetup;
+  /**
+   * Optional teardown function called with `path` after the final terminal using this
+   * workspace is disposed.
+   */
+  teardown?: DirTeardown;
+};
 
 /**
  * Prepares a temporary directory created by {@link TmpDir}.
@@ -31,15 +47,13 @@ export type TmpDirSetup = (dir: string) => Awaitable<void>;
  */
 export type TmpDirOptions = {
   /**
-   * Prefix for the generated temporary directory name.
-   *
-   * Defaults to `"termdem-"`.
-   */
-  prefix?: string;
-  /**
    * Optional setup function called with the fresh temporary directory before the demo uses it.
    */
   setup?: TmpDirSetup;
+  /**
+   * Optional teardown function called before the temporary directory is removed.
+   */
+  teardown?: TmpDirSetup;
 };
 
 /**
@@ -50,6 +64,15 @@ export type TerminalCleanupContext = {
   cwd: string;
   /** Terminal name from the matching terminal definition. */
   name: string;
+};
+
+export type TerminalWorkspace = {
+  cwd: string;
+  dispose(): Promise<void>;
+};
+
+export type TerminalWorkspaceProvider = {
+  acquire(): Promise<TerminalWorkspace>;
 };
 
 /**
@@ -76,7 +99,7 @@ export type TerminalWorkspaceDefinition = {
    * Share the same `Dir` or `TmpDir` instance between definitions when panes should
    * operate in the same directory.
    */
-  pwd: Dir;
+  pwd: TerminalWorkspaceProvider;
   /**
    * Hidden shell command run before visible demo actions begin.
    *
@@ -84,11 +107,6 @@ export type TerminalWorkspaceDefinition = {
    * in the visible transcript.
    */
   setupCommand?: string;
-};
-
-export type TerminalWorkspace = {
-  cwd: string;
-  dispose(): Promise<void>;
 };
 
 /**
@@ -100,7 +118,7 @@ export type TerminalWorkspace = {
  *
  * @example
  * ```ts
- * const project = new Dir(() => "/absolute/path/to/project");
+ * const project = new Dir({ path: "/absolute/path/to/project" });
  *
  * export const demo = createTerminalDemo([
  *   { name: "server", pwd: project },
@@ -113,36 +131,35 @@ export type TerminalWorkspace = {
  *
  * @example
  * ```ts
- * const workspace = new Dir(
- *   async () => {
- *     await fs.mkdir("demo-workspace", { recursive: true });
- *     return "demo-workspace";
+ * const workspace = new Dir({
+ *   path: "demo-workspace",
+ *   setup: async (dir) => {
+ *     await fs.mkdir(dir, { recursive: true });
  *   },
- *   async (dir) => {
+ *   teardown: async (dir) => {
  *     await fs.rm(dir, { recursive: true, force: true });
  *   },
- * );
+ * });
  * ```
  */
 export class Dir {
   #allocation: Promise<string> | null = null;
   #cleanup: Promise<void> | null = null;
   #cwd: string | null = null;
-  #dispose: DirCleanup | undefined;
+  #path: string;
   #references = 0;
-  #setup: DirSetup;
+  #setup: DirSetup | undefined;
+  #teardown: DirTeardown | undefined;
 
   /**
    * Creates a reusable workspace provider.
    *
-   * @param setup - Function that returns the directory path to use. It may create or
-   * prepare the directory before returning.
-   * @param cleanup - Optional function called with the directory path after the final
-   * terminal using this `Dir` is disposed.
+   * @param options - Workspace path and optional setup/teardown hooks.
    */
-  constructor(setup: DirSetup, cleanup?: DirCleanup) {
-    this.#setup = setup;
-    this.#dispose = cleanup;
+  constructor(options: DirOptions) {
+    this.#path = options.path;
+    this.#setup = options.setup;
+    this.#teardown = options.teardown;
   }
 
   /**
@@ -195,7 +212,7 @@ export class Dir {
     const cwd = this.#cwd;
     this.#cwd = null;
     this.#allocation = null;
-    const cleanup = Promise.resolve(this.#dispose?.(cwd)).finally(() => {
+    const cleanup = Promise.resolve(this.#teardown?.(cwd)).finally(() => {
       if (this.#cleanup === cleanup) {
         this.#cleanup = null;
       }
@@ -221,7 +238,8 @@ export class Dir {
   }
 
   async #setupCwd() {
-    const cwd = await this.#setup();
+    const cwd = this.#path;
+    await this.#setup?.(cwd);
     this.#cwd = cwd;
     return cwd;
   }
@@ -236,8 +254,10 @@ export class Dir {
  *
  * @example
  * ```ts
- * const repo = new TmpDir(async (dir) => {
- *   await fs.writeFile(path.join(dir, "README.md"), "# Demo\n", "utf8");
+ * const repo = new TmpDir({
+ *   setup: async (dir) => {
+ *     await fs.writeFile(path.join(dir, "README.md"), "# Demo\n", "utf8");
+ *   },
  * });
  *
  * export const demo = createTerminalDemo([
@@ -251,42 +271,128 @@ export class Dir {
  * @example
  * ```ts
  * const workspace = new TmpDir({
- *   prefix: "my-demo-",
  *   setup: async (dir) => {
  *     await fs.mkdir(path.join(dir, "src"));
+ *   },
+ *   teardown: async (dir) => {
+ *     await fs.copyFile(path.join(dir, "log.txt"), "last-demo-log.txt");
  *   },
  * });
  * ```
  */
-export class TmpDir extends Dir {
+export class TmpDir {
+  #allocation: Promise<string> | null = null;
+  #cleanup: Promise<void> | null = null;
+  #cwd: string | null = null;
+  #references = 0;
+  #setup: TmpDirSetup | undefined;
+  #teardown: TmpDirSetup | undefined;
+
   /**
    * Creates a temporary workspace provider.
    *
-   * @param options - Either a setup function or an options object. When a function is
-   * passed, it is called with the fresh temporary directory. When an object is passed,
-   * `setup` prepares the directory and `prefix` customizes the temporary directory name.
+   * @param options - Workspace setup/teardown hooks.
    */
-  constructor(options: TmpDirOptions | TmpDirSetup = {}) {
-    const setup = typeof options === "function" ? options : options.setup;
-    const prefix = typeof options === "function" ? "termdem-" : (options.prefix ?? "termdem-");
+  constructor(options: TmpDirOptions) {
+    this.#setup = options.setup;
+    this.#teardown = options.teardown;
+  }
 
-    super(
-      async () => {
-        const cwd = await mkdtemp(join(tmpdir(), prefix));
+  /**
+   * Acquires this workspace for one terminal.
+   *
+   * Most demo authors do not need to call this directly; pass the `TmpDir` instance
+   * as `pwd` in a terminal definition instead.
+   *
+   * @returns A workspace handle with the directory path and a `dispose()` function.
+   */
+  async acquire(): Promise<TerminalWorkspace> {
+    const cwd = await this.#ensureCwd();
+    this.#references += 1;
 
-        try {
-          await setup?.(cwd);
-        } catch (error) {
-          await rm(cwd, { recursive: true, force: true });
-          throw error;
+    let disposed = false;
+    return {
+      cwd,
+      dispose: async () => {
+        if (disposed) {
+          return;
         }
 
-        return cwd;
+        disposed = true;
+        this.#references -= 1;
+        if (this.#references === 0) {
+          await this.#release();
+        }
       },
-      async (cwd) => {
-        await rm(cwd, { recursive: true, force: true });
-      },
-    );
+    };
+  }
+
+  async #release(): Promise<void> {
+    if (this.#cleanup) {
+      await this.#cleanup;
+      return;
+    }
+
+    if (this.#allocation) {
+      try {
+        await this.#allocation;
+      } catch {
+        return;
+      }
+    }
+
+    if (!this.#cwd) {
+      return;
+    }
+
+    const cwd = this.#cwd;
+    this.#cwd = null;
+    this.#allocation = null;
+    const cleanup = Promise.resolve()
+      .then(async () => {
+        try {
+          await this.#teardown?.(cwd);
+        } finally {
+          await rm(cwd, { recursive: true, force: true });
+        }
+      })
+      .finally(() => {
+        if (this.#cleanup === cleanup) {
+          this.#cleanup = null;
+        }
+      });
+    this.#cleanup = cleanup;
+    await cleanup;
+  }
+
+  async #ensureCwd(): Promise<string> {
+    if (this.#cleanup) {
+      await this.#cleanup;
+    }
+
+    if (this.#cwd) {
+      return this.#cwd;
+    }
+
+    if (!this.#allocation) {
+      this.#allocation = this.#setupCwd();
+    }
+
+    return this.#allocation;
+  }
+
+  async #setupCwd() {
+    const cwd = await mkdtemp(join(tmpdir(), "termdem-"));
+
+    try {
+      await this.#setup?.(cwd);
+    } catch (error) {
+      await rm(cwd, { recursive: true, force: true });
+      throw error;
+    }
+
+    this.#cwd = cwd;
+    return cwd;
   }
 }
 

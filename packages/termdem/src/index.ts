@@ -6,10 +6,12 @@ export type { TypingDelay } from "./typing-delays.ts";
 export {
   Dir,
   TmpDir,
-  type DirCleanup,
+  type DirOptions,
   type DirSetup,
+  type DirTeardown,
   type TerminalCleanupContext,
   type TerminalWorkspaceDefinition,
+  type TerminalWorkspaceProvider,
   type TmpDirOptions,
   type TmpDirSetup,
 } from "./workspace.ts";

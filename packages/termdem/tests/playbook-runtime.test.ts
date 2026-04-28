@@ -67,7 +67,7 @@ test("execFileForPlaybook captures stdout, stderr, exit code, timeout, and rejec
 
 test("playbook runtime retries waitFor probes and reports timeout labels", async () => {
   const runtime = new PlaybookRuntime({
-    terminalDefinitions: [{ name: "main", pwd: new TmpDir() }],
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
     typeDelayMs: 0,
   });
   let attempts = 0;
@@ -92,7 +92,7 @@ test("playbook runtime cancellation prevents stale playbook completion", async (
     onPlaybookState(state) {
       states.push(state.state);
     },
-    terminalDefinitions: [{ name: "main", pwd: new TmpDir() }],
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
     typeDelayMs: 0,
   });
 
@@ -109,7 +109,7 @@ test("playbook runtime cancellation prevents stale playbook completion", async (
 
 test("playbook runtime ignores overlapping start requests", async () => {
   const runtime = new PlaybookRuntime({
-    terminalDefinitions: [{ name: "main", pwd: new TmpDir() }],
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
     typeDelayMs: 0,
   });
   let starts = 0;

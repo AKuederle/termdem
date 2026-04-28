@@ -232,7 +232,7 @@ export type TerminalDemo<
  *   type TerminalPaneComponents,
  * } from "@akuederle/termdem";
  *
- * const workspace = new TmpDir();
+ * const workspace = new TmpDir({});
  *
  * export const demo = createTerminalDemo(
  *   [{ name: "main", pwd: workspace }],

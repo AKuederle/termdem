@@ -7,7 +7,7 @@ import {
 } from "@akuederle/termdem";
 
 const workspacePath = decodeURIComponent(new URL(".", import.meta.url).pathname);
-const workspace = new Dir(() => workspacePath);
+const workspace = new Dir({ path: workspacePath });
 
 export const demo = createTerminalDemo(
   [

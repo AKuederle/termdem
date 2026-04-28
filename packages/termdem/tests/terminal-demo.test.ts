@@ -3,7 +3,7 @@ import { createTerminalDemo, TmpDir } from "../src/index.ts";
 import { clientShimSource, previewEntrySource } from "../src/preview-server.ts";
 
 test("createTerminalDemo preserves backend terminal definitions and config", () => {
-  const dir = new TmpDir();
+  const dir = new TmpDir({});
   const script = () => {};
 
   const demo = createTerminalDemo(
@@ -36,7 +36,7 @@ test("createTerminalDemo preserves backend terminal definitions and config", () 
 
 test("createTerminalDemo scripts can wait without selecting a pane", async () => {
   const calls: string[] = [];
-  const demo = createTerminalDemo([{ name: "main", pwd: new TmpDir() }], async (api) => {
+  const demo = createTerminalDemo([{ name: "main", pwd: new TmpDir({}) }], async (api) => {
     await api.wait(125);
     calls.push("after wait");
   });
