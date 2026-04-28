@@ -207,7 +207,7 @@ class NodePtyPaneSession implements PaneSession {
   }
 
   private async performTypeHidden(text: string, options: TypeOptions = {}) {
-    if (submitsOrControlsTerminal(text)) {
+    if (submitsOrRepaintsPrompt(text)) {
       this.hideOutputUntilPrompt();
     }
 
@@ -447,15 +447,14 @@ function nextAlternateScreenState(current: boolean, text: string) {
   return next;
 }
 
-function submitsOrControlsTerminal(text: string) {
-  for (const char of text) {
-    const code = char.charCodeAt(0);
-    if (code < 32 || code === 127) {
-      return true;
-    }
-  }
-
-  return false;
+function submitsOrRepaintsPrompt(text: string) {
+  return (
+    text.includes("\r") ||
+    text.includes("\n") ||
+    text.includes(String.fromCharCode(3)) ||
+    text.includes(String.fromCharCode(4)) ||
+    text.includes(String.fromCharCode(12))
+  );
 }
 
 async function sleep(delayMs: number) {
