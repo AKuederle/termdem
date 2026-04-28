@@ -46,4 +46,6 @@ jobs:
 
       - name: Publish package
         working-directory: packages/termdem
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance
