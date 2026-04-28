@@ -23,13 +23,13 @@
  */
 export const typingDelays = {
   /** Slow, deliberate typing. */
-  WPM_30: 250,
+  WPM_30: 400,
   /** Comfortable presentation speed. */
-  WPM_60: 100,
+  WPM_60: 200,
   /** Brisk typing for commands that should still be readable. */
-  WPM_80: 75,
+  WPM_80: 150,
   /** Fast typing for low-emphasis commands. */
-  WPM_120: 50,
+  WPM_120: 100,
 } as const;
 
 /**
