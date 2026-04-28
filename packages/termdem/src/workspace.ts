@@ -290,7 +290,7 @@ export class TmpDir {
    *
    * @param options - Workspace setup/teardown hooks.
    */
-  constructor(options: TmpDirOptions) {
+  constructor(options: TmpDirOptions = {}) {
     this.#setup = options.setup;
     this.#teardown = options.teardown;
   }

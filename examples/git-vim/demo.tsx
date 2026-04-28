@@ -61,11 +61,9 @@ export const demo = createTerminalDemo({
 });
 
 export function render(panes: TerminalPaneComponents<typeof demo>) {
-  const GitPane = panes.git;
-
   return (
     <main className="grid h-full w-full bg-[#111] p-1">
-      <GitPane className="min-h-0 min-w-0 transition data-[termdem-current]:ring-2 data-[termdem-current]:ring-cyan-300 data-[termdem-current]:brightness-110" />
+      <panes.git className="min-h-0 min-w-0 transition data-[termdem-current]:ring-2 data-[termdem-current]:ring-cyan-300 data-[termdem-current]:brightness-110" />
     </main>
   );
 }

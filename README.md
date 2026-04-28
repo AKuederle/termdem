@@ -40,7 +40,7 @@ Tailwind v4 is available in demo files, so regular utility classes are enough fo
 ```tsx
 import { TmpDir, createTerminalDemo, type TerminalPaneComponents } from "@akuederle/termdem";
 
-const workspace = new TmpDir({});
+const workspace = new TmpDir();
 
 export const demo = createTerminalDemo({
   panes: [
@@ -72,7 +72,7 @@ Use normal JavaScript between terminal actions whenever you need to parse output
 ```ts
 import { TmpDir, createTerminalDemo, quoteShellArg } from "@akuederle/termdem";
 
-const workspace = new TmpDir({});
+const workspace = new TmpDir();
 
 export const demo = createTerminalDemo({
   panes: [
@@ -164,7 +164,7 @@ export const demo = createTerminalDemo({
 });
 ```
 
-### Full-screen Terminal Apps
+### Full-screen Terminal Apps/Long running processes.
 
 For editors and other full-screen terminal apps, start the process with `sendLine()` so the script can keep sending keystrokes while the app remains open.
 Use `type()` for raw input, `press(keys.ENTER)` for supported special keys, and short `wait()` calls when the app needs a moment to redraw.
