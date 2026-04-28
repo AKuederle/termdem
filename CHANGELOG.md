@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `pane.screen()` for reading the current rendered terminal buffer from long-running commands.
+
 ### Fixed
 
 - Fixed the published package's Vite dependency to resolve to real Vite instead of Vite Plus core.
