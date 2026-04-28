@@ -24,6 +24,10 @@ type PaneRuntime = PaneController & {
   write(data: string): void;
 };
 
+type ReadyPaneRuntime = PaneController & {
+  ready: boolean;
+};
+
 type PendingAction = {
   reject: (error: Error) => void;
   resolve: () => void;
@@ -78,6 +82,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   const previewModeRef = useRef<PreviewMode>(initialPreviewMode);
   const resumeWaitersRef = useRef<Array<() => void>>([]);
   const runningPlaybookKeyRef = useRef<string | null>(null);
+  const [currentPaneName, setCurrentPaneName] = useState<string | null>(null);
   const [paneMountError, setPaneMountError] = useState<string | null>(null);
   const [paneMountVersion, setPaneMountVersion] = useState(0);
   const [overlayVisible, setOverlayVisible] = useState(false);
@@ -126,8 +131,15 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   });
 
   const paneComponents = useMemo(
-    () => createPaneComponents(paneNames, sessionKey, onPaneMountChange, onRuntimeChange),
-    [onPaneMountChange, onRuntimeChange, paneNames, sessionKey],
+    () =>
+      createPaneComponents(
+        paneNames,
+        sessionKey,
+        currentPaneName,
+        onPaneMountChange,
+        onRuntimeChange,
+      ),
+    [currentPaneName, onPaneMountChange, onRuntimeChange, paneNames, sessionKey],
   );
 
   const resumePlaybook = useEffectEvent(() => {
@@ -149,6 +161,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
     playbookRunIdRef.current += 1;
     paneRuntimesRef.current.clear();
     runningPlaybookKeyRef.current = null;
+    setCurrentPaneName(null);
     resumePlaybook();
 
     const waiters = resumeWaitersRef.current.splice(0);
@@ -187,7 +200,11 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
 
     try {
       await demo.script(
-        createPlaybookApi(paneRuntimesRef.current, () => waitForPlaybookActive(runId)),
+        createPlaybookApi(
+          paneRuntimesRef.current,
+          () => waitForPlaybookActive(runId),
+          setCurrentPaneName,
+        ),
       );
       if (runId === playbookRunIdRef.current) {
         markRecordingDone(true);
@@ -318,12 +335,14 @@ function paneNamesFromTerminalDefinitions(terminalDefinitions: readonly { name: 
 
 function PaneTerminalCard({
   className,
+  isCurrent,
   name,
   onMountChange,
   onRuntimeChange,
   style,
 }: {
   className?: string;
+  isCurrent: boolean;
   name: string;
   onMountChange: (name: string, delta: number) => void;
   onRuntimeChange: (name: string, runtime: PaneRuntime) => void;
@@ -353,7 +372,7 @@ function PaneTerminalCard({
 
   return (
     <article
-      {...paneFrameDataAttributes(name, false)}
+      {...paneFrameDataAttributes(name, isCurrent)}
       className={`${paneFrameClassName} ${className ?? ""}`}
       style={style}
     >
@@ -382,6 +401,7 @@ function PaneTerminalCard({
 function createPaneComponents(
   paneNames: string[],
   sessionKey: number,
+  currentPaneName: string | null,
   onMountChange: (name: string, delta: number) => void,
   onRuntimeChange: (name: string, runtime: PaneRuntime) => void,
 ) {
@@ -392,6 +412,7 @@ function createPaneComponents(
           <PaneTerminalCard
             key={`${sessionKey}:${name}`}
             className={className}
+            isCurrent={currentPaneName === name}
             name={name}
             onMountChange={onMountChange}
             onRuntimeChange={onRuntimeChange}
@@ -609,9 +630,10 @@ function usePaneConnection(paneName: string) {
   };
 }
 
-function createPlaybookApi(
-  runtimes: Map<string, PaneRuntime>,
+export function createPlaybookApi(
+  runtimes: Map<string, ReadyPaneRuntime>,
   waitForPlaybookActive: () => Promise<void>,
+  setCurrentPaneName: (name: string) => void,
 ) {
   return {
     async wait(delayMs: number) {
@@ -628,6 +650,7 @@ function createPlaybookApi(
       return {
         async exec(command, options) {
           await waitForPlaybookActive();
+          setCurrentPaneName(name);
           return runPaneAction(
             `pane(${JSON.stringify(name)}).exec(${JSON.stringify(command)})`,
             async () => {
@@ -639,6 +662,7 @@ function createPlaybookApi(
         },
         async press(key) {
           await waitForPlaybookActive();
+          setCurrentPaneName(name);
           await runPaneAction(
             `pane(${JSON.stringify(name)}).press(${JSON.stringify(key)})`,
             async () => {
@@ -649,6 +673,7 @@ function createPlaybookApi(
         },
         async type(text, options) {
           await waitForPlaybookActive();
+          setCurrentPaneName(name);
           await runPaneAction(
             `pane(${JSON.stringify(name)}).type(${summarizeText(text)})`,
             async () => {
