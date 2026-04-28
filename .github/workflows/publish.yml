@@ -46,4 +46,4 @@ jobs:
 
       - name: Publish package
         working-directory: packages/termdem
-        run: npx npm@latest publish --access public
+        run: pnpm publish --access public --provenance --no-git-checks
