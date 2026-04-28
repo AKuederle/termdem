@@ -1,4 +1,13 @@
-import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createRoot } from "react-dom/client";
 import { Terminal, useTerminal } from "@wterm/react";
 import "@wterm/react/css";
@@ -53,6 +62,7 @@ const paneFrameClassName =
   "flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#101010] text-slate-100";
 
 const ignoreTerminalInput = () => {};
+const CurrentPaneNameContext = createContext<string | null>(null);
 
 export function paneFrameDataAttributes(name: string, isCurrent: boolean) {
   return {
@@ -131,15 +141,8 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   });
 
   const paneComponents = useMemo(
-    () =>
-      createPaneComponents(
-        paneNames,
-        sessionKey,
-        currentPaneName,
-        onPaneMountChange,
-        onRuntimeChange,
-      ),
-    [currentPaneName, onPaneMountChange, onRuntimeChange, paneNames, sessionKey],
+    () => createPaneComponents(paneNames, sessionKey, onPaneMountChange, onRuntimeChange),
+    [onPaneMountChange, onRuntimeChange, paneNames, sessionKey],
   );
 
   const resumePlaybook = useEffectEvent(() => {
@@ -295,7 +298,9 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
 
   return (
     <>
-      {demo.render(paneComponents)}
+      <CurrentPaneNameContext value={currentPaneName}>
+        {demo.render(paneComponents)}
+      </CurrentPaneNameContext>
       {overlayVisible ? (
         <PreviewOverlay
           mode={previewMode}
@@ -335,14 +340,12 @@ function paneNamesFromTerminalDefinitions(terminalDefinitions: readonly { name: 
 
 function PaneTerminalCard({
   className,
-  isCurrent,
   name,
   onMountChange,
   onRuntimeChange,
   style,
 }: {
   className?: string;
-  isCurrent: boolean;
   name: string;
   onMountChange: (name: string, delta: number) => void;
   onRuntimeChange: (name: string, runtime: PaneRuntime) => void;
@@ -350,6 +353,7 @@ function PaneTerminalCard({
 }) {
   const { connectionKey, exec, press, ref, requestResize, status, type, write } =
     usePaneConnection(name);
+  const currentPaneName = useContext(CurrentPaneNameContext);
 
   useEffect(() => {
     onMountChange(name, 1);
@@ -372,7 +376,7 @@ function PaneTerminalCard({
 
   return (
     <article
-      {...paneFrameDataAttributes(name, isCurrent)}
+      {...paneFrameDataAttributes(name, currentPaneName === name)}
       className={`${paneFrameClassName} ${className ?? ""}`}
       style={style}
     >
@@ -401,7 +405,6 @@ function PaneTerminalCard({
 function createPaneComponents(
   paneNames: string[],
   sessionKey: number,
-  currentPaneName: string | null,
   onMountChange: (name: string, delta: number) => void,
   onRuntimeChange: (name: string, runtime: PaneRuntime) => void,
 ) {
@@ -412,7 +415,6 @@ function createPaneComponents(
           <PaneTerminalCard
             key={`${sessionKey}:${name}`}
             className={className}
-            isCurrent={currentPaneName === name}
             name={name}
             onMountChange={onMountChange}
             onRuntimeChange={onRuntimeChange}
