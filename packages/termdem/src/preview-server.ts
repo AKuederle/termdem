@@ -288,6 +288,7 @@ export function nodeBuiltinsBrowserExternal(): Plugin {
   const virtualPrefix = "\0termdem-node-builtin-browser-external:";
 
   return {
+    enforce: "pre",
     name: "termdem-node-builtins-browser-external",
     resolveId(source, _importer, options) {
       if (options?.ssr || !nodeBuiltinNames.has(source)) {

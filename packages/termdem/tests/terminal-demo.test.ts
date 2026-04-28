@@ -119,6 +119,8 @@ test("preview Vite config externalizes Node builtins from the browser bundle", a
     throw new Error("Expected node builtin external plugin to expose a resolveId hook");
   }
 
+  expect(plugin.enforce).toBe("pre");
+
   const resolve = resolveId as ResolveIdHook;
 
   expect(resolve.call(undefined, "node:dgram", undefined, { ssr: false })).toBe(

@@ -40,6 +40,12 @@ Create one `.tsx` file per demo, export the `demo` returned by `createTerminalDe
 5. Preview the demo in your browser with `npx termdem preview ./demos/demo.tsx`.
 6. Record the demo to a video file with `npx termdem record ./demos/demo.tsx ./demo.webm`.
 
+> [!WARNING]
+> Demo files are loaded in two places: the preview server runs `setup`, `script`, and `teardown`, while the browser imports the same module to render the panes.
+> Importing backend-only modules such as `node:fs`, `node:path`, or `node:dgram` is fine when they are only used from server-side callbacks.
+> Do not execute backend-only code at module top level, because the browser render path evaluates top-level code too.
+> Keep filesystem, socket, process, and other Node-only work inside `TmpDir` setup, demo `setup`, `script`, `teardown`, or functions called only from those callbacks.
+
 ### Create a Scene
 
 Panes define the terminals that the script can control and the render function can display.
