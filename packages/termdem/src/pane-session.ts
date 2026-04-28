@@ -448,12 +448,14 @@ function nextAlternateScreenState(current: boolean, text: string) {
 }
 
 function submitsOrControlsTerminal(text: string) {
-  return (
-    text.includes("\r") ||
-    text.includes("\n") ||
-    text.includes(String.fromCharCode(3)) ||
-    text.includes(String.fromCharCode(4))
-  );
+  for (const char of text) {
+    const code = char.charCodeAt(0);
+    if (code < 32 || code === 127) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function sleep(delayMs: number) {

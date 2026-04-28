@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
+import { keys } from "../src/keys.ts";
 import { PlaybookRuntime, execFileForPlaybook } from "../src/playbook-runtime.ts";
 import { createPaneSession } from "../src/pane-session.ts";
 import { TmpDir } from "../src/workspace.ts";
@@ -114,6 +115,7 @@ test("playbook runtime runs hidden lifecycle hooks around the visible script", a
         await api.pane("main").type("printf hidden-type");
         await api.pane("main").press("Enter");
         await api.pane("main").type("printf hidden-type-enter\r");
+        await api.pane("main").type(keys.CTRL_L);
         return { message: result.text };
       },
       teardown: async (api, setupData) => {
@@ -132,6 +134,7 @@ test("playbook runtime runs hidden lifecycle hooks around the visible script", a
   expect(transcript).not.toContain("hidden-type");
   expect(transcript).not.toContain("hidden-type-enter");
   expect(transcript).not.toContain("hidden-teardown");
+  expect(transcript).not.toContain("\x1b[H");
   expect(states).toContain("done");
   expect(teardownData).toEqual(["hidden setup output"]);
 });
