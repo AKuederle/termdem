@@ -52,36 +52,37 @@ export const demo = createTerminalDemo({
       pwd: workspace,
     },
   ],
-  script: async (api) => {
-    // This is where the script goes
-  },
+  script: async () => {},
   settings: {
-    // render config
     size: { width: 1920, height: 1080 },
   },
 });
 
 export function render(panes: TerminalPaneComponents<typeof demo>) {
-
-
   return (
     <main className="grid h-full w-full min-h-0 grid-cols-2 grid-rows-1 gap-px bg-[#333] p-px">
-      <ServerPane className={`min-h-0 min-w-0`} />
-      <SenderPane className={`min-h-0 min-w-0 col-start-1`} />
+      <panes.pane1 className="min-h-0 min-w-0" />
+      <panes.pane2 className="min-h-0 min-w-0" />
     </main>
   );
 }
-
-function parseChatUrl(output: string) {
-  const match = output.match(/\bCHAT_URL=(tcp:\/\/127\.0\.0\.1:\d+)\b/u);
-  if (!match) {
-    throw new Error(`Could not find CHAT_URL in server setup output:\n${output}`);
-  }
-
-  return match[1];
-}
-
 ```
+
+## Tips
+
+### Highlight the active terminal
+
+### Run Setup and Teardown
+
+There are multiple levels of setup and teardown levels.
+The first one is for the working dir.
+Both `Dir` and `TmpDir` support `setup` and `teardown` funcs that allow to seed the dirs with certain files.
+Note, that for `TmpDir`, `teardown` is usually not required, as we just delete the dir after the run.
+
+The second level are the `setup` and `teardown` funcs that can be passed to `createTerminalDemo`.
+They work like the script callback and have access to the same functionality, with two distinctions.
+The commands are not displayed on the frontend and the default `typingDelay` is set to 0 ms/typing simulation for `exec` is turned off to speed up the execution.
+The setup func can return a data object that will be provided as a second argument to the `script`
 
 ## How it works
 
