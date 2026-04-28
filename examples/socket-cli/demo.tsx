@@ -64,17 +64,14 @@ export const demo = createTerminalDemo({
 });
 
 export function render(panes: TerminalPaneComponents<typeof demo>) {
-  const ServerPane = panes.server;
-  const SenderPane = panes.sender;
-  const ListenerPane = panes.listener;
   const currentPaneClassName =
     "transition data-[termdem-current]:z-10 data-[termdem-current]:ring-2 data-[termdem-current]:ring-cyan-300 data-[termdem-current]:brightness-110";
 
   return (
     <main className="grid h-full w-full min-h-0 grid-cols-[1fr_1.1fr] grid-rows-2 gap-px bg-[#333] p-px">
-      <ServerPane className={`min-h-0 min-w-0 ${currentPaneClassName}`} />
-      <SenderPane className={`row-start-2 min-h-0 min-w-0 ${currentPaneClassName}`} />
-      <ListenerPane
+      <panes.server className={`min-h-0 min-w-0 ${currentPaneClassName}`} />
+      <panes.sender className={`row-start-2 min-h-0 min-w-0 ${currentPaneClassName}`} />
+      <panes.listener
         className={`col-start-2 row-span-2 row-start-1 min-h-0 min-w-0 ${currentPaneClassName}`}
       />
     </main>

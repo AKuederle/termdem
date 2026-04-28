@@ -52,13 +52,10 @@ export type TerminalPaneComponent = (props: TerminalPaneProps) => ReactElement;
  * @example
  * ```tsx
  * export function render(panes: TerminalPaneComponents<typeof demo>) {
- *   const ServerPane = panes.server;
- *   const ClientPane = panes.client;
- *
  *   return (
  *     <main className="grid h-full w-full grid-cols-2">
- *       <ServerPane className="min-h-0 min-w-0" />
- *       <ClientPane className="min-h-0 min-w-0" />
+ *       <panes.server className="min-h-0 min-w-0" />
+ *       <panes.client className="min-h-0 min-w-0" />
  *     </main>
  *   );
  * }
@@ -289,10 +286,9 @@ export type TerminalDemo<
  * });
  *
  * export function render(panes: TerminalPaneComponents<typeof demo>) {
- *   const MainPane = panes.main;
  *   return (
  *     <main className="grid h-full w-full bg-[#111] p-1">
- *       <MainPane className="min-h-0 min-w-0" />
+ *       <panes.main className="min-h-0 min-w-0" />
  *     </main>
  *   );
  * }
