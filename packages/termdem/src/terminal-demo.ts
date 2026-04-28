@@ -83,7 +83,7 @@ type Awaitable<T> = T | Promise<T>;
  *
  * async function waitForServer(api: TerminalDemoScriptApi<"server" | "client">) {
  *   await api.waitFor("server is accepting requests", async () => {
- *     const result = await api.node.execFile("curl", ["-fsS", "http://127.0.0.1:3000"], {
+ *     const result = await api.node.exec("curl", ["-fsS", "http://127.0.0.1:3000"], {
  *       reject: false,
  *       timeoutMs: 1000,
  *     });
@@ -127,7 +127,7 @@ export type TerminalDemoScriptApi<Name extends string> = {
      * @example
      * ```ts
      * await api.waitFor("server ready", async () => {
-     *   const result = await api.node.execFile("curl", ["-fsS", "http://127.0.0.1:3000"], {
+     *   const result = await api.node.exec("curl", ["-fsS", "http://127.0.0.1:3000"], {
      *     reject: false,
      *     timeoutMs: 1000,
      *   });
@@ -136,7 +136,7 @@ export type TerminalDemoScriptApi<Name extends string> = {
      * });
      * ```
      */
-    execFile(
+    exec(
       file: string,
       args?: readonly string[],
       options?: NodeExecOptions,
@@ -179,7 +179,7 @@ export type TerminalDemoScriptApi<Name extends string> = {
    * @example
    * ```ts
    * await api.waitFor("API is accepting requests", async () => {
-   *   const result = await api.node.execFile("curl", ["-fsS", "http://127.0.0.1:3000"], {
+   *   const result = await api.node.exec("curl", ["-fsS", "http://127.0.0.1:3000"], {
    *     reject: false,
    *   });
    *

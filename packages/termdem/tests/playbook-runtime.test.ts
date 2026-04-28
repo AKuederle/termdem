@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
 import { keys } from "../src/keys.ts";
-import { PlaybookRuntime, execFileForPlaybook } from "../src/playbook-runtime.ts";
+import { PlaybookRuntime } from "../src/playbook-runtime.ts";
 import { createPaneSession } from "../src/pane-session.ts";
 import { TmpDir } from "../src/workspace.ts";
 
@@ -35,7 +35,7 @@ test("pane sessions sendLine visibly starts a command without waiting for prompt
   }
 });
 
-test("execFileForPlaybook captures stdout, stderr, exit code, timeout, and reject behavior", async () => {
+test("node exec captures stdout, stderr, exit code, timeout, and reject behavior", async () => {
   const cwd = await createTempDir();
   const scriptPath = join(cwd, "probe.mjs");
   await writeFile(
@@ -47,23 +47,29 @@ test("execFileForPlaybook captures stdout, stderr, exit code, timeout, and rejec
     ].join("\n"),
     "utf8",
   );
-
-  await expect(execFileForPlaybook(process.execPath, [scriptPath, "7"], { cwd })).rejects.toThrow(
-    "exited with code 7",
-  );
-
-  const result = await execFileForPlaybook(process.execPath, [scriptPath, "7"], {
-    cwd,
-    reject: false,
+  const runtime = new PlaybookRuntime({
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
+    typeDelayMs: 0,
   });
-  expect(result).toEqual({ exitCode: 7, stderr: "err", stdout: "out" });
 
-  const timeout = await execFileForPlaybook(process.execPath, [scriptPath, "0"], {
-    cwd,
-    reject: false,
-    timeoutMs: 1,
+  await runtime.run(async (api) => {
+    await expect(api.node.exec(process.execPath, [scriptPath, "7"], { cwd })).rejects.toThrow(
+      "exited with code 7",
+    );
+
+    const result = await api.node.exec(process.execPath, [scriptPath, "7"], {
+      cwd,
+      reject: false,
+    });
+    expect(result).toEqual({ exitCode: 7, stderr: "err", stdout: "out" });
+
+    const timeout = await api.node.exec(process.execPath, [scriptPath, "0"], {
+      cwd,
+      reject: false,
+      timeoutMs: 1,
+    });
+    expect(timeout.exitCode).not.toBe(0);
   });
-  expect(timeout.exitCode).not.toBe(0);
 });
 
 test("playbook runtime retries waitFor probes and reports timeout labels", async () => {

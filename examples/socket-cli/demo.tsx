@@ -34,7 +34,7 @@ export const demo = createTerminalDemo({
 
     await listener.sendLine(`node scripts/client.mjs listen ${quoteShellArg(url)}`);
     await api.waitFor("listener ready", async () => {
-      const result = await api.node.execFile("node", ["scripts/server.mjs", "health", url], {
+      const result = await api.node.exec("node", ["scripts/server.mjs", "health", url], {
         cwd: workspacePath,
         reject: false,
         timeoutMs: 1_000,
@@ -50,7 +50,7 @@ export const demo = createTerminalDemo({
       `node scripts/client.mjs send ${quoteShellArg(url)} ${quoteShellArg("message from sender pane")}`,
     );
     await server.exec("node scripts/server.mjs status");
-    await api.node.execFile("node", ["scripts/server.mjs", "cleanup"], {
+    await api.node.exec("node", ["scripts/server.mjs", "cleanup"], {
       cwd: workspacePath,
       reject: false,
       timeoutMs: 1_000,

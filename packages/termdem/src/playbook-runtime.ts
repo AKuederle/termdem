@@ -207,7 +207,7 @@ export class PlaybookRuntime<Name extends string = string> {
   ): TerminalDemoScriptApi<Name> {
     return {
       node: {
-        execFile: (file, args = [], options = {}) => execFileForPlaybook(file, args, options),
+        exec: (file, args = [], options = {}) => execForPlaybook(file, args, options),
       },
       pane: (name) => this.createPaneController(String(name), generation, options),
       wait: async (delayMs) => {
@@ -396,7 +396,7 @@ export class PlaybookRuntime<Name extends string = string> {
   }
 }
 
-export function execFileForPlaybook(
+export function execForPlaybook(
   file: string,
   args: readonly string[] = [],
   options: NodeExecOptions = {},

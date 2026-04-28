@@ -154,7 +154,7 @@ export interface PaneController {
 }
 
 /**
- * Options for `api.node.execFile()`, which runs a hidden Node-side process.
+ * Options for `api.node.exec()`, which runs a hidden Node-side process.
  */
 export type NodeExecOptions = {
   /** Working directory for the child process. Defaults to the preview server process directory. */
@@ -179,7 +179,7 @@ export type NodeExecOptions = {
 };
 
 /**
- * Result returned by `api.node.execFile()`.
+ * Result returned by `api.node.exec()`.
  */
 export type NodeExecResult = {
   /** Numeric process exit code. */

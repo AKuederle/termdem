@@ -113,7 +113,7 @@ export const demo = createTerminalDemo({
     await api.pane("main").exec(`node cli.mjs login ${quoteShellArg(setupData.token)}`);
   },
   teardown: async (api) => {
-    await api.node.execFile("node", ["scripts/cleanup.mjs"], { reject: false });
+    await api.node.exec("node", ["scripts/cleanup.mjs"], { reject: false });
   },
 });
 ```
@@ -160,8 +160,8 @@ await api.pane("client").exec(`node client.mjs ${quoteShellArg(url)}`);
 
 ### "Hidden" Commands
 
-Use normal JavaScript inside `script`, `setup`, and `teardown` for values that do not need a shell, and use `api.node.execFile()` for hidden subprocesses.
-`api.node.execFile()` can run any executable available to the preview server, but it receives an executable plus an argument array rather than a shell command string.
+Use normal JavaScript inside `script`, `setup`, and `teardown` for values that do not need a shell, and use `api.node.exec()` for hidden subprocesses.
+`api.node.exec()` can run any executable available to the preview server, but it receives an executable plus an argument array rather than a shell command string.
 Use `sh -c` explicitly if you need shell syntax such as pipes, redirects, or environment-variable expansion.
 Use `pane.cwd()` when the hidden process should run in the same current working directory as a pane.
 This pairs well with `api.waitFor()` when a visible pane starts a server and the script needs to wait until it is ready.
@@ -172,7 +172,7 @@ await server.sendLine("npm run dev");
 
 await api.waitFor("server ready", async () => {
   const cwd = await server.cwd();
-  const result = await api.node.execFile("curl", ["-fsS", "http://127.0.0.1:5173"], {
+  const result = await api.node.exec("curl", ["-fsS", "http://127.0.0.1:5173"], {
     cwd,
     reject: false,
     timeoutMs: 1000,
