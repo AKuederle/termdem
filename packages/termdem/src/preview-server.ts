@@ -337,20 +337,20 @@ async function handleBrowserMessage(
 
 async function loadDemoModule(viteServer: ViteDevServer, demoPath: string) {
   const demoModule = (await viteServer.ssrLoadModule(`/@fs/${toVitePath(demoPath)}`)) as unknown;
-  const demo = readDefaultPreviewDemo(demoModule);
+  const demo = readNamedPreviewDemo(demoModule);
   if (!isPreviewDemoModule(demo)) {
-    throw new Error("Demo module must default-export the createTerminalDemo result");
+    throw new Error('Demo module must export the createTerminalDemo result as "demo"');
   }
 
   return demo;
 }
 
-function readDefaultPreviewDemo(value: unknown): unknown {
+function readNamedPreviewDemo(value: unknown): unknown {
   if (typeof value !== "object" || value === null) {
     return undefined;
   }
 
-  return (value as { default?: unknown }).default;
+  return (value as { demo?: unknown }).demo;
 }
 
 function isPreviewDemoModule(value: unknown): value is PreviewDemoModule {
@@ -534,9 +534,9 @@ function uniqueSourceRoots(sourceRoots: string[]) {
   return [...new Set(sourceRoots)];
 }
 
-function previewEntrySource(demoPath: string) {
+export function previewEntrySource(demoPath: string) {
   return `import "./style.css";
-import demo, { render } from ${JSON.stringify(`/@fs/${toVitePath(demoPath)}`)};
+import { demo, render } from ${JSON.stringify(`/@fs/${toVitePath(demoPath)}`)};
 import { renderPreviewApp } from "@akuederle/termdem/preview-client";
 
 renderPreviewApp({

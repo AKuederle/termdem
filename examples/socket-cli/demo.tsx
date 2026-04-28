@@ -9,7 +9,7 @@ import {
 const workspacePath = decodeURIComponent(new URL(".", import.meta.url).pathname);
 const workspace = new Dir(() => workspacePath);
 
-const demo = createTerminalDemo(
+export const demo = createTerminalDemo(
   [
     {
       name: "server",
@@ -63,21 +63,19 @@ const demo = createTerminalDemo(
   },
 );
 
-export default demo;
-
 export function render(panes: TerminalPaneComponents<typeof demo>) {
   const ServerPane = panes.server;
   const SenderPane = panes.sender;
   const ListenerPane = panes.listener;
   const currentPaneClassName =
-    "transition data-[termdem-current]:relative data-[termdem-current]:z-10 data-[termdem-current]:ring-2 data-[termdem-current]:ring-cyan-300 data-[termdem-current]:brightness-110";
+    "transition data-[termdem-current]:z-10 data-[termdem-current]:ring-2 data-[termdem-current]:ring-cyan-300 data-[termdem-current]:brightness-110";
 
   return (
-    <main className="grid h-dvh min-h-0 grid-cols-1 grid-rows-3 gap-px bg-[#333] p-px lg:grid-cols-[1fr_1.1fr] lg:grid-rows-2">
+    <main className="grid h-full w-full min-h-0 grid-cols-[1fr_1.1fr] grid-rows-2 gap-px bg-[#333] p-px">
       <ServerPane className={`min-h-0 min-w-0 ${currentPaneClassName}`} />
-      <SenderPane className={`min-h-0 min-w-0 lg:row-start-2 ${currentPaneClassName}`} />
+      <SenderPane className={`row-start-2 min-h-0 min-w-0 ${currentPaneClassName}`} />
       <ListenerPane
-        className={`min-h-0 min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 ${currentPaneClassName}`}
+        className={`col-start-2 row-span-2 row-start-1 min-h-0 min-w-0 ${currentPaneClassName}`}
       />
     </main>
   );

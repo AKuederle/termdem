@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { createTerminalDemo, TmpDir } from "../src/index.ts";
-import { clientShimSource } from "../src/preview-server.ts";
+import { clientShimSource, previewEntrySource } from "../src/preview-server.ts";
 
 test("createTerminalDemo preserves backend terminal definitions and config", () => {
   const dir = new TmpDir();
@@ -69,4 +69,11 @@ test("client shim exports browser-safe public demo helpers", () => {
   expect(source).toContain("export const typingDelays");
   expect(source).toContain("WPM_120: 100");
   expect(source).not.toContain('export { keys } from "@akuederle/termdem"');
+});
+
+test("preview entry imports demo through a named export", () => {
+  const source = previewEntrySource("/tmp/demo.tsx");
+
+  expect(source).toContain('import { demo, render } from "/@fs//tmp/demo.tsx";');
+  expect(source).not.toContain("import demo");
 });

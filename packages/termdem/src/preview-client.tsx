@@ -17,7 +17,8 @@ import {
   type BrowserToServerMessage,
   type ServerToBrowserMessage,
 } from "./protocol.ts";
-import type { RecordingConfig } from "./recording-config.ts";
+import { flushQueuedPreviewMessages, queueOrSendPreviewMessage } from "./preview-socket.ts";
+import type { DemoSize, RecordingConfig } from "./recording-config.ts";
 import type { TerminalPaneComponent, TerminalPaneProps } from "./terminal-demo.ts";
 
 type PreviewDemoModule = {
@@ -50,7 +51,71 @@ export function renderPreviewApp(demo: PreviewDemoModule) {
     throw new Error("Missing #root element for termdem preview");
   }
 
-  createRoot(rootElement).render(<PreviewApp demo={demo} />);
+  createRoot(rootElement).render(<PreviewRoot demo={demo} />);
+}
+
+function PreviewRoot({ demo }: { demo: PreviewDemoModule }) {
+  const frameSize = previewFrameSize(demo.config);
+  if (frameSize && !readEmbeddedPreview()) {
+    return <FixedPreviewFrame size={frameSize} />;
+  }
+
+  return <PreviewApp demo={demo} />;
+}
+
+function FixedPreviewFrame({ size }: { size: DemoSize }) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  useEffect(() => {
+    const sync = () => {
+      syncEmbeddedPreviewState(iframeRef.current);
+    };
+
+    sync();
+    const interval = setInterval(sync, 50);
+    return () => {
+      clearInterval(interval);
+      delete globalThis.__termdem?.controls;
+      delete globalThis.__termdem?.recording;
+    };
+  }, []);
+
+  return (
+    <main className="flex h-dvh w-dvw items-center justify-center overflow-auto bg-[#111]">
+      <iframe
+        ref={iframeRef}
+        className="shrink-0 border-0 bg-[#111]"
+        height={size.height}
+        onLoad={() => {
+          syncEmbeddedPreviewState(iframeRef.current);
+        }}
+        src={embeddedPreviewUrl()}
+        title="termdem preview"
+        width={size.width}
+      />
+    </main>
+  );
+}
+
+export function previewFrameSize(config: RecordingConfig): DemoSize | null {
+  return config.viewportSize ?? config.size ?? null;
+}
+
+function syncEmbeddedPreviewState(iframe: HTMLIFrameElement | null) {
+  const embeddedWindow = iframe?.contentWindow as
+    | (Window & { __termdem?: typeof globalThis.__termdem })
+    | null
+    | undefined;
+  const embeddedTermdem = embeddedWindow?.__termdem;
+  globalThis.__termdem = {
+    ...globalThis.__termdem,
+    controls: {
+      restart: () => embeddedTermdem?.controls?.restart?.(),
+      start: () => embeddedTermdem?.controls?.start?.(),
+      stop: () => embeddedTermdem?.controls?.stop?.(),
+    },
+    recording: embeddedTermdem?.recording,
+  };
 }
 
 function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
@@ -64,15 +129,11 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
     "connecting",
   );
   const listenersRef = useRef(new Map<string, Set<(message: ServerToBrowserMessage) => void>>());
+  const pendingMessagesRef = useRef<BrowserToServerMessage[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
 
   const send = useEffectEvent((message: BrowserToServerMessage) => {
-    const socket = socketRef.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      throw new Error("Preview socket is not connected");
-    }
-
-    socket.send(JSON.stringify(message));
+    queueOrSendPreviewMessage(socketRef.current, pendingMessagesRef.current, message);
   });
 
   const addPaneListener = useCallback(
@@ -127,6 +188,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
 
     socket.onopen = () => {
       setSocketStatus("open");
+      flushQueuedPreviewMessages(socket, pendingMessagesRef.current);
       if (initialAutostart) {
         socket.send(JSON.stringify({ type: "playbook.start" }));
       }
@@ -187,6 +249,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
       if (socketRef.current === socket) {
         socketRef.current = null;
       }
+      pendingMessagesRef.current = [];
       socket.close();
     };
   }, [initialAutostart]);
@@ -374,6 +437,16 @@ function bridgeToken() {
 
 function readInitialAutostart() {
   return new URL(window.location.href).searchParams.get("termdem_autostart") !== "0";
+}
+
+function readEmbeddedPreview() {
+  return new URL(window.location.href).searchParams.get("termdem_embedded") === "1";
+}
+
+function embeddedPreviewUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.set("termdem_embedded", "1");
+  return url.toString();
 }
 
 function updateRecordingState(
