@@ -33,6 +33,40 @@ test("parseBrowserToServerMessage accepts pane resize and input messages", () =>
   });
 });
 
+test("parseBrowserToServerMessage accepts pane screen responses", () => {
+  expect(
+    parseBrowserToServerMessage(
+      JSON.stringify({
+        type: "pane.screen.response",
+        pane: "server",
+        requestId: "screen-1",
+        snapshot: {
+          altScreen: false,
+          cols: 80,
+          cursor: { col: 5, row: 2, visible: true },
+          lines: ["ready", "listening"],
+          rows: 24,
+          scrollbackCount: 3,
+          text: "ready\nlistening",
+        },
+      }),
+    ),
+  ).toEqual({
+    type: "pane.screen.response",
+    pane: "server",
+    requestId: "screen-1",
+    snapshot: {
+      altScreen: false,
+      cols: 80,
+      cursor: { col: 5, row: 2, visible: true },
+      lines: ["ready", "listening"],
+      rows: 24,
+      scrollbackCount: 3,
+      text: "ready\nlistening",
+    },
+  });
+});
+
 test("parseBrowserToServerMessage accepts playbook controls and rejects browser playbook actions", () => {
   expect(parseBrowserToServerMessage(JSON.stringify({ type: "playbook.start" }))).toEqual({
     type: "playbook.start",
@@ -127,6 +161,20 @@ test("parseServerToBrowserMessage accepts pane, playbook, recording, and preview
   ).toEqual({
     type: "preview.error",
     message: "boom",
+  });
+
+  expect(
+    parseServerToBrowserMessage(
+      JSON.stringify({
+        type: "pane.screen.request",
+        pane: "server",
+        requestId: "screen-1",
+      }),
+    ),
+  ).toEqual({
+    type: "pane.screen.request",
+    pane: "server",
+    requestId: "screen-1",
   });
 
   expect(parseServerToBrowserMessage(JSON.stringify({ type: "preview.reset" }))).toEqual({

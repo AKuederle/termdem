@@ -11,11 +11,36 @@ export type PaneResizeMessage = {
   rows: number;
 };
 
+export type PaneScreenSnapshot = {
+  altScreen: boolean;
+  cols: number;
+  cursor: {
+    col: number;
+    row: number;
+    visible: boolean;
+  };
+  lines: string[];
+  rows: number;
+  scrollbackCount: number;
+  text: string;
+};
+
+export type PaneScreenResponseMessage = {
+  type: "pane.screen.response";
+  pane: string;
+  requestId: string;
+  snapshot: PaneScreenSnapshot;
+};
+
 export type PlaybookControlMessage = {
   type: "playbook.start" | "playbook.restart" | "playbook.stop";
 };
 
-export type BrowserToServerMessage = PaneInputMessage | PaneResizeMessage | PlaybookControlMessage;
+export type BrowserToServerMessage =
+  | PaneInputMessage
+  | PaneResizeMessage
+  | PaneScreenResponseMessage
+  | PlaybookControlMessage;
 
 export type PaneMetaMessage = {
   type: "pane.meta";
@@ -36,6 +61,12 @@ export type PaneStatusMessage = {
   pane: string;
   status: "ready" | "closed" | "error";
   message?: string;
+};
+
+export type PaneScreenRequestMessage = {
+  type: "pane.screen.request";
+  pane: string;
+  requestId: string;
 };
 
 export type PlaybookStateMessage = {
@@ -64,6 +95,7 @@ export type PreviewResetMessage = {
 export type ServerToBrowserMessage =
   | PaneMetaMessage
   | PaneOutputMessage
+  | PaneScreenRequestMessage
   | PaneStatusMessage
   | PlaybookStateMessage
   | RecordingStateMessage
@@ -96,6 +128,18 @@ export function parseBrowserToServerMessage(raw: string): BrowserToServerMessage
         cols: payload.cols,
         rows: payload.rows,
       };
+    case "pane.screen.response": {
+      const snapshot = parsePaneScreenSnapshot(payload.snapshot);
+      if (!isPaneName(payload.pane) || !isRequestId(payload.requestId) || !snapshot) {
+        return null;
+      }
+      return {
+        type: "pane.screen.response",
+        pane: payload.pane,
+        requestId: payload.requestId,
+        snapshot,
+      };
+    }
     case "playbook.start":
     case "playbook.restart":
     case "playbook.stop":
@@ -133,6 +177,11 @@ export function parseServerToBrowserMessage(raw: string): ServerToBrowserMessage
         return null;
       }
       return { type: "pane.output", pane: payload.pane, data: payload.data };
+    case "pane.screen.request":
+      if (!isPaneName(payload.pane) || !isRequestId(payload.requestId)) {
+        return null;
+      }
+      return { type: "pane.screen.request", pane: payload.pane, requestId: payload.requestId };
     case "pane.status":
       if (
         !isPaneName(payload.pane) ||
@@ -197,8 +246,58 @@ function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isRequestId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function parsePaneScreenSnapshot(value: unknown): PaneScreenSnapshot | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+
+  const snapshot = value as Record<string, unknown>;
+  const cursor = snapshot.cursor;
+  if (typeof cursor !== "object" || cursor === null || Array.isArray(cursor)) {
+    return null;
+  }
+
+  const cursorRecord = cursor as Record<string, unknown>;
+  if (
+    typeof snapshot.altScreen !== "boolean" ||
+    !isPositiveInteger(snapshot.cols) ||
+    !isPositiveInteger(snapshot.rows) ||
+    !isNonNegativeInteger(snapshot.scrollbackCount) ||
+    typeof snapshot.text !== "string" ||
+    !Array.isArray(snapshot.lines) ||
+    !snapshot.lines.every((line) => typeof line === "string") ||
+    !isNonNegativeInteger(cursorRecord.col) ||
+    !isNonNegativeInteger(cursorRecord.row) ||
+    typeof cursorRecord.visible !== "boolean"
+  ) {
+    return null;
+  }
+
+  return {
+    altScreen: snapshot.altScreen,
+    cols: snapshot.cols,
+    cursor: {
+      col: cursorRecord.col,
+      row: cursorRecord.row,
+      visible: cursorRecord.visible,
+    },
+    lines: snapshot.lines,
+    rows: snapshot.rows,
+    scrollbackCount: snapshot.scrollbackCount,
+    text: snapshot.text,
+  };
 }
 
 function isPlaybookState(value: unknown) {
