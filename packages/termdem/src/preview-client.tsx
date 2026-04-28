@@ -22,9 +22,9 @@ import type { DemoSize, RecordingConfig } from "./recording-config.ts";
 import type { TerminalPaneComponent, TerminalPaneProps } from "./terminal-demo.ts";
 
 type PreviewDemoModule = {
-  config: RecordingConfig;
+  panes: readonly { name: string }[];
   render: (panes: Record<string, TerminalPaneComponent>) => ReactNode;
-  terminalDefinitions: readonly { name: string }[];
+  settings: RecordingConfig;
 };
 
 type PreviewSocketContextValue = {
@@ -55,7 +55,7 @@ export function renderPreviewApp(demo: PreviewDemoModule) {
 }
 
 function PreviewRoot({ demo }: { demo: PreviewDemoModule }) {
-  const frameSize = previewFrameSize(demo.config);
+  const frameSize = previewFrameSize(demo.settings);
   if (frameSize && !readEmbeddedPreview()) {
     return <FixedPreviewFrame size={frameSize} />;
   }
@@ -119,9 +119,7 @@ function syncEmbeddedPreviewState(iframe: HTMLIFrameElement | null) {
 }
 
 function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
-  const paneNames = useInitialValue(() =>
-    paneNamesFromTerminalDefinitions(demo.terminalDefinitions),
-  );
+  const paneNames = useInitialValue(() => paneNamesFromTerminalDefinitions(demo.panes));
   const initialAutostart = useInitialValue(() => readInitialAutostart());
   const [currentPaneName, setCurrentPaneName] = useState<string | null>(null);
   const [overlayVisible, setOverlayVisible] = useState(false);

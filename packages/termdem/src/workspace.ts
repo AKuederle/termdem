@@ -113,12 +113,15 @@ export type TerminalWorkspaceDefinition = {
  * ```ts
  * const project = new Dir({ path: "/absolute/path/to/project" });
  *
- * export const demo = createTerminalDemo([
- *   { name: "server", pwd: project },
- *   { name: "client", pwd: project },
- * ], async (api) => {
- *   await api.pane("server").sendLine("npm run dev");
- *   await api.pane("client").exec("npm test");
+ * export const demo = createTerminalDemo({
+ *   panes: [
+ *     { name: "server", pwd: project },
+ *     { name: "client", pwd: project },
+ *   ],
+ *   script: async (api) => {
+ *     await api.pane("server").sendLine("npm run dev");
+ *     await api.pane("client").exec("npm test");
+ *   },
  * });
  * ```
  *
@@ -253,11 +256,12 @@ export class Dir {
  *   },
  * });
  *
- * export const demo = createTerminalDemo([
- *   { name: "git", pwd: repo },
- * ], async (api) => {
- *   await api.pane("git").exec("git init");
- *   await api.pane("git").exec("cat README.md");
+ * export const demo = createTerminalDemo({
+ *   panes: [{ name: "git", pwd: repo }],
+ *   script: async (api) => {
+ *     await api.pane("git").exec("git init");
+ *     await api.pane("git").exec("cat README.md");
+ *   },
  * });
  * ```
  *

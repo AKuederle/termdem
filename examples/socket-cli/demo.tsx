@@ -9,8 +9,8 @@ import {
 const workspacePath = decodeURIComponent(new URL(".", import.meta.url).pathname);
 const workspace = new Dir({ path: workspacePath });
 
-export const demo = createTerminalDemo(
-  [
+export const demo = createTerminalDemo({
+  panes: [
     {
       name: "server",
       pwd: workspace,
@@ -24,7 +24,7 @@ export const demo = createTerminalDemo(
       pwd: workspace,
     },
   ],
-  async (api) => {
+  script: async (api) => {
     const server = api.pane("server");
     const listener = api.pane("listener");
     const sender = api.pane("sender");
@@ -56,12 +56,12 @@ export const demo = createTerminalDemo(
       timeoutMs: 1_000,
     });
   },
-  {
+  settings: {
     size: { width: 1920, height: 1080 },
     typeDelayMs: typingDelays.WPM_120,
     viewportSize: { width: 1440, height: 810 },
   },
-);
+});
 
 export function render(panes: TerminalPaneComponents<typeof demo>) {
   const ServerPane = panes.server;

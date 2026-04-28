@@ -12,14 +12,14 @@ const repo = new TmpDir({
   },
 });
 
-export const demo = createTerminalDemo(
-  [
+export const demo = createTerminalDemo({
+  panes: [
     {
       name: "git",
       pwd: repo,
     },
   ],
-  async (api) => {
+  script: async (api) => {
     const git = api.pane("git");
 
     await git.exec("git init");
@@ -47,18 +47,18 @@ export const demo = createTerminalDemo(
     await git.exec("git commit -m 'Create README through vim'");
     await git.exec("git log --oneline --decorate --stat -1");
   },
-  {
-    setup: async (api) => {
-      // Keep the recording focused on `vim README.md`, while making Vim deterministic:
-      // ignore user config/history, skip swap files, and make Esc resolve quickly.
-      await api
-        .pane("git")
-        .exec(`alias vim='vim -Nu NONE -n -i NONE --cmd "set ttimeout ttimeoutlen=10"'`);
-    },
+  setup: async (api) => {
+    // Keep the recording focused on `vim README.md`, while making Vim deterministic:
+    // ignore user config/history, skip swap files, and make Esc resolve quickly.
+    await api
+      .pane("git")
+      .exec(`alias vim='vim -Nu NONE -n -i NONE --cmd "set ttimeout ttimeoutlen=10"'`);
+  },
+  settings: {
     size: { width: 1280, height: 720 },
     typeDelayMs: typingDelays.WPM_120,
   },
-);
+});
 
 export function render(panes: TerminalPaneComponents<typeof demo>) {
   const GitPane = panes.git;

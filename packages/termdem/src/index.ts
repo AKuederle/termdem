@@ -17,9 +17,9 @@ export {
 } from "./workspace.ts";
 export {
   createTerminalDemo,
+  type CreateTerminalDemoOptions,
   type TerminalDefinition,
   type TerminalDemo,
-  type TerminalDemoOptions,
   type TerminalPaneComponent,
   type TerminalPaneComponents,
   type TerminalPaneProps,

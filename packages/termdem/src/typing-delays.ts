@@ -7,10 +7,14 @@
  *
  * @example
  * ```ts
- * export const demo = createTerminalDemo(terminals, async (api) => {
- *   await api.pane("main").exec("npm test");
- * }, {
- *   typeDelayMs: typingDelays.WPM_120,
+ * export const demo = createTerminalDemo({
+ *   panes,
+ *   script: async (api) => {
+ *     await api.pane("main").exec("npm test");
+ *   },
+ *   settings: {
+ *     typeDelayMs: typingDelays.WPM_120,
+ *   },
  * });
  * ```
  *

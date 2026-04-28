@@ -98,13 +98,16 @@ type Awaitable<T> = T | Promise<T>;
  *
  * @example Full script
  * ```ts
- * export const demo = createTerminalDemo([
- *   { name: "server", pwd: workspace },
- *   { name: "client", pwd: workspace },
- * ], async (api) => {
- *   await api.pane("server").sendLine("npm run dev");
- *   await waitForServer(api);
- *   await api.pane("client").exec("curl http://127.0.0.1:3000");
+ * export const demo = createTerminalDemo({
+ *   panes: [
+ *     { name: "server", pwd: workspace },
+ *     { name: "client", pwd: workspace },
+ *   ],
+ *   script: async (api) => {
+ *     await api.pane("server").sendLine("npm run dev");
+ *     await waitForServer(api);
+ *     await api.pane("client").exec("curl http://127.0.0.1:3000");
+ *   },
  * });
  * ```
  */
@@ -146,8 +149,7 @@ export type TerminalDemoScriptApi<Name extends string> = {
   /**
    * Returns a controller for a visible terminal pane.
    *
-   * @param name - Name of a terminal from the `terminalDefinitions` array passed to
-   * `createTerminalDemo()`.
+   * @param name - Name of a terminal from the `panes` array passed to `createTerminalDemo()`.
    *
    * @example
    * ```ts
@@ -208,20 +210,29 @@ export type TerminalDemoTeardown<Name extends string, SetupData = undefined> = (
   setupData: SetupData,
 ) => Awaitable<void>;
 
-export type TerminalDemoOptions<Name extends string, SetupData = undefined> = RecordingConfig & {
+export type CreateTerminalDemoOptions<
+  TTerminals extends readonly TerminalDefinition[],
+  SetupData = undefined,
+> = {
+  /** Terminal panes available to the script and render function. */
+  panes: TTerminals;
+  /** Script that drives visible panes and hidden Node-side work. */
+  script: TerminalDemoScript<TTerminals[number]["name"], SetupData>;
   /**
    * Hidden setup callback run before the visible demo script.
    *
    * It receives the same API as the script, but pane commands run without frontend output
    * and default to instant execution. Its return value is passed to the script.
    */
-  setup?: TerminalDemoSetup<Name, SetupData>;
+  setup?: TerminalDemoSetup<TTerminals[number]["name"], SetupData>;
   /**
    * Hidden teardown callback run after the visible demo script.
    *
    * It receives the same hidden API as setup and the setup return value.
    */
-  teardown?: TerminalDemoTeardown<Name, SetupData>;
+  teardown?: TerminalDemoTeardown<TTerminals[number]["name"], SetupData>;
+  /** Recording and preview configuration for this demo. */
+  settings?: RecordingConfig;
 };
 
 /**
@@ -232,16 +243,16 @@ export type TerminalDemo<
   TName extends TTerminals[number]["name"] = TTerminals[number]["name"],
   TSetupData = undefined,
 > = {
-  /** Recording and preview configuration for this demo. */
-  config: RecordingConfig;
+  /** Terminal panes available to the script and render function. */
+  panes: TTerminals;
   /** Script that drives visible panes and hidden Node-side work. */
   script: TerminalDemoScript<TName, TSetupData>;
+  /** Recording and preview configuration for this demo. */
+  settings: RecordingConfig;
   /** Hidden setup hook run before the visible script. */
   setup?: TerminalDemoSetup<TName, TSetupData>;
   /** Hidden teardown hook run after the visible script. */
   teardown?: TerminalDemoTeardown<TName, TSetupData>;
-  /** Terminal panes available to the script and render function. */
-  terminalDefinitions: TTerminals;
 };
 
 /**
@@ -250,14 +261,8 @@ export type TerminalDemo<
  * A demo module should export the returned value as a named `demo` export, and export
  * a separate `render()` function that lays out the generated pane components.
  *
- * @param terminalDefinitions - Terminal panes available to the demo. Each item needs a
- * unique `name` and a workspace `pwd`. The names become keys in `panes` for `render()`
- * and valid names for `api.pane(name)` in the script.
- * @param script - Async function that performs the demo. Use `api.pane(name)` for
- * visible terminal actions, `api.node.execFile()` for hidden Node-side work, and
- * `api.waitFor()` for readiness checks.
- * @param config - Optional recording and preview configuration such as `size`,
- * `viewportSize`, and default `typeDelayMs`.
+ * @param options - Demo panes, script, optional lifecycle hooks, and optional recording
+ * settings.
  * @returns A typed terminal demo object.
  *
  * @example
@@ -271,17 +276,17 @@ export type TerminalDemo<
  *
  * const workspace = new TmpDir({});
  *
- * export const demo = createTerminalDemo(
- *   [{ name: "main", pwd: workspace }],
- *   async (api) => {
+ * export const demo = createTerminalDemo({
+ *   panes: [{ name: "main", pwd: workspace }],
+ *   script: async (api) => {
  *     const main = api.pane("main");
  *     await main.exec("node --version");
  *   },
- *   {
+ *   settings: {
  *     size: { width: 1280, height: 720 },
  *     typeDelayMs: typingDelays.WPM_120,
  *   },
- * );
+ * });
  *
  * export function render(panes: TerminalPaneComponents<typeof demo>) {
  *   const MainPane = panes.main;
@@ -296,18 +301,22 @@ export type TerminalDemo<
 export function createTerminalDemo<
   const TTerminals extends readonly TerminalDefinition[],
   const TSetupData = undefined,
->(
-  terminalDefinitions: TTerminals,
-  script: TerminalDemoScript<TTerminals[number]["name"], TSetupData>,
-  options: TerminalDemoOptions<TTerminals[number]["name"], TSetupData> = {},
-): TerminalDemo<TTerminals, TTerminals[number]["name"], TSetupData> {
-  const { setup, teardown, ...config } = options;
-
+>({
+  panes,
+  script,
+  settings = {},
+  setup,
+  teardown,
+}: CreateTerminalDemoOptions<TTerminals, TSetupData>): TerminalDemo<
+  TTerminals,
+  TTerminals[number]["name"],
+  TSetupData
+> {
   return {
-    config,
+    panes,
     script,
+    settings,
     setup,
-    terminalDefinitions,
     teardown,
   };
 }

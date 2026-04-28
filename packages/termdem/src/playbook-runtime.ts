@@ -70,6 +70,7 @@ export class PlaybookRuntime<Name extends string = string> {
   private activeRun: Promise<void> | null = null;
   private generation = 0;
   private closed = false;
+  private hiddenPaneOutputDepth = 0;
 
   constructor(options: PlaybookRuntimeOptions) {
     this.options = options;
@@ -88,6 +89,10 @@ export class PlaybookRuntime<Name extends string = string> {
         cols: 20,
         cwd: workspace.cwd,
         onOutput: (data) => {
+          if (this.hiddenPaneOutputDepth > 0) {
+            return;
+          }
+
           this.options.onPaneOutput?.({ data, pane: terminal.name });
         },
         prompt,
@@ -231,7 +236,9 @@ export class PlaybookRuntime<Name extends string = string> {
         hiddenPaneExec: true,
         publishActions: false,
       });
-      setupData = (await lifecycle.setup?.(setupApi)) as SetupData | undefined;
+      setupData = (await this.runWithHiddenPaneOutput(() => lifecycle.setup?.(setupApi))) as
+        | SetupData
+        | undefined;
       setupComplete = true;
       await script(this.createApi(generation), setupData as SetupData);
     } catch (error) {
@@ -246,7 +253,9 @@ export class PlaybookRuntime<Name extends string = string> {
           hiddenPaneExec: true,
           publishActions: false,
         });
-        await lifecycle.teardown(teardownApi, setupData as SetupData);
+        await this.runWithHiddenPaneOutput(() =>
+          lifecycle.teardown?.(teardownApi, setupData as SetupData),
+        );
       } catch (error) {
         runError ??= error;
       }
@@ -309,6 +318,10 @@ export class PlaybookRuntime<Name extends string = string> {
       },
       sendLine: async (command: string, options?: TypeOptions): Promise<void> => {
         await this.ensureActive(generation, actionName("sendLine"));
+        if (controllerOptions.hiddenPaneExec) {
+          await this.readyPane(name).execHidden(command);
+          return;
+        }
         await this.readyPane(name).sendLine(command, withDefaultTypeDelay(options));
       },
       type: async (text: string, options?: TypeOptions): Promise<void> => {
@@ -344,6 +357,15 @@ export class PlaybookRuntime<Name extends string = string> {
 
   private publishPlaybookState(state: PlaybookState) {
     this.options.onPlaybookState?.(state);
+  }
+
+  private async runWithHiddenPaneOutput<T>(task: () => T | Promise<T>) {
+    this.hiddenPaneOutputDepth += 1;
+    try {
+      return await task();
+    } finally {
+      this.hiddenPaneOutputDepth -= 1;
+    }
   }
 
   private async closePanes() {

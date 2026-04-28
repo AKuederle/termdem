@@ -122,7 +122,7 @@ export async function runRecordCommand(
       throw new Error("Preview server did not expose a local URL for recording.");
     }
 
-    const recordingConfig = resolveRecordingConfig(previewServer.demo.config, command.cliOptions);
+    const recordingConfig = resolveRecordingConfig(previewServer.demo.settings, command.cliOptions);
     await dependencies.recordBrowserPage({
       format: command.format,
       onProgress(message) {

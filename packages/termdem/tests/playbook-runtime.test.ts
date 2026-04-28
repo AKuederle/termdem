@@ -110,6 +110,10 @@ test("playbook runtime runs hidden lifecycle hooks around the visible script", a
     {
       setup: async (api) => {
         const result = await api.pane("main").exec("printf 'hidden setup output'");
+        await api.pane("main").sendLine("printf hidden-sendline");
+        await api.pane("main").type("printf hidden-type");
+        await api.pane("main").press("Enter");
+        await api.wait(50);
         return { message: result.text };
       },
       teardown: async (api, setupData) => {
@@ -124,6 +128,8 @@ test("playbook runtime runs hidden lifecycle hooks around the visible script", a
   expect(transcript).toContain("printf visible-script");
   expect(transcript).toContain("visible-script");
   expect(transcript).not.toContain("hidden setup output");
+  expect(transcript).not.toContain("hidden-sendline");
+  expect(transcript).not.toContain("hidden-type");
   expect(transcript).not.toContain("hidden-teardown");
   expect(states).toContain("done");
   expect(teardownData).toEqual(["hidden setup output"]);

@@ -271,8 +271,8 @@ async function wirePreviewClient({
         onRecordingState(state) {
           broadcast({ type: "recording.state", ...state });
         },
-        terminalDefinitions: demo.terminalDefinitions ?? [],
-        typeDelayMs: demo.config?.typeDelayMs,
+        terminalDefinitions: demo.panes ?? [],
+        typeDelayMs: demo.settings?.typeDelayMs,
       });
       saveRuntime(activeRuntime);
       await activeRuntime.ensureReady();
@@ -354,7 +354,7 @@ function readNamedPreviewDemo(value: unknown): unknown {
 }
 
 function isPreviewDemoModule(value: unknown): value is PreviewDemoModule {
-  return typeof value === "object" && value !== null && "terminalDefinitions" in value;
+  return typeof value === "object" && value !== null && "panes" in value;
 }
 
 function sendPreviewMessage(ws: WebSocket, message: ServerToBrowserMessage) {
@@ -540,9 +540,9 @@ import { demo, render } from ${JSON.stringify(`/@fs/${toVitePath(demoPath)}`)};
 import { renderPreviewApp } from "@akuederle/termdem/preview-client";
 
 renderPreviewApp({
-  config: demo.config,
+  panes: demo.panes,
   render,
-  terminalDefinitions: demo.terminalDefinitions,
+  settings: demo.settings,
 });
 `;
 }
@@ -585,13 +585,12 @@ export class TmpDir extends Dir {
   }
 }
 
-export function createTerminalDemo(terminalDefinitions, script, config = {}) {
-  const { setup, teardown, ...recordingConfig } = config;
+export function createTerminalDemo({ panes, script, settings = {}, setup, teardown }) {
   return {
-    config: recordingConfig,
+    panes,
     script,
+    settings,
     setup,
-    terminalDefinitions,
     teardown,
   };
 }

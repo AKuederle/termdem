@@ -34,6 +34,7 @@ type CompletedExecState = {
   resolve: (result: ExecResult) => void;
   result: ExecResult;
   timer: ReturnType<typeof setTimeout>;
+  visible: boolean;
 };
 
 const defaultPrompt = "TERMDEM> ";
@@ -263,7 +264,7 @@ class NodePtyPaneSession implements PaneSession {
     }
 
     this.alternateScreenActive = nextAlternateScreenState(this.alternateScreenActive, text);
-    if (this.pendingExec?.visible !== false) {
+    if (this.pendingExec?.visible !== false && this.completedExec?.visible !== false) {
       this.emitVisible(text);
     }
     if (this.captureActive) {
@@ -323,6 +324,7 @@ class NodePtyPaneSession implements PaneSession {
         this.completedExec = null;
         completedExec.reject(new Error(`Timed out waiting for prompt ${this.prompt}`));
       }, 2000),
+      visible: pendingExec.visible,
     };
   }
 

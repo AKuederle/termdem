@@ -126,7 +126,8 @@ test("runRecordCommand records the headless preview and closes the server", asyn
 
         return {
           demo: {
-            config: {
+            panes: [],
+            settings: {
               size: { width: 1280, height: 720 },
             },
           },

@@ -41,8 +41,8 @@ import {
 
 const workspace = new TmpDir({});
 
-export const demo = createTerminalDemo(
-  [
+export const demo = createTerminalDemo({
+  panes: [
     {
       name: "pane1",
       pwd: workspace,
@@ -52,14 +52,14 @@ export const demo = createTerminalDemo(
       pwd: workspace,
     },
   ],
-  async (api) => {
+  script: async (api) => {
     // This is where the script goes
   },
-  {
+  settings: {
     // render config
     size: { width: 1920, height: 1080 },
   },
-);
+});
 
 export function render(panes: TerminalPaneComponents<typeof demo>) {
 
