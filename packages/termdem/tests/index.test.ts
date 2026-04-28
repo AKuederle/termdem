@@ -103,6 +103,12 @@ test("pane sessions fail fast for unsupported non-bash shells", async () => {
   ).rejects.toThrow("Only bash shells are currently supported");
 });
 
+test("pane sessions reject empty prompts", async () => {
+  await expect(createPaneSession({ prompt: "" })).rejects.toThrow(
+    "Pane session prompt must not be empty",
+  );
+});
+
 test("pane sessions can chain exec results from ls into cat", async () => {
   const cwd = await createTempDir();
   await writeFile(join(cwd, "alpha.txt"), "alpha file\n", "utf8");

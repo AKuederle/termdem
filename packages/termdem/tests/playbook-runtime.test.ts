@@ -116,6 +116,11 @@ test("playbook runtime runs hidden lifecycle hooks around the visible script", a
         await api.pane("main").press("Enter");
         await api.pane("main").type("printf hidden-type-enter\r");
         await api.pane("main").type("printf hidden-multi-a\rprintf hidden-multi-b\r");
+        await api
+          .pane("main")
+          .type(
+            "printf '(main) $ (main) $ hidden-prompt-string'\rprintf hidden-after-prompt-string\r",
+          );
         await api.pane("main").type(keys.CTRL_L);
         await api.pane("main").type(keys.ESC);
         await api.pane("main").press("Enter");
@@ -138,6 +143,8 @@ test("playbook runtime runs hidden lifecycle hooks around the visible script", a
   expect(transcript).not.toContain("hidden-type-enter");
   expect(transcript).not.toContain("hidden-multi-a");
   expect(transcript).not.toContain("hidden-multi-b");
+  expect(transcript).not.toContain("hidden-prompt-string");
+  expect(transcript).not.toContain("hidden-after-prompt-string");
   expect(transcript).not.toContain("hidden-teardown");
   expect(transcript).not.toContain("\x1b[H");
   expect(states).toContain("done");

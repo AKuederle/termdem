@@ -44,6 +44,10 @@ const defaultPrompt = "TERMDEM> ";
 
 export async function createPaneSession(options: PaneSessionOptions = {}): Promise<PaneSession> {
   const prompt = options.prompt ?? defaultPrompt;
+  if (prompt === "") {
+    throw new Error("Pane session prompt must not be empty");
+  }
+
   const shell = options.shell ?? "/bin/bash";
   if (!shell.endsWith("bash")) {
     throw new Error("Only bash shells are currently supported");
@@ -314,10 +318,7 @@ class NodePtyPaneSession implements PaneSession {
     }
 
     if (suppressHiddenPromptOutput) {
-      this.hiddenOutputUntilPrompt = Math.max(
-        0,
-        this.hiddenOutputUntilPrompt - countOccurrences(visibleText, this.prompt),
-      );
+      this.hiddenOutputUntilPrompt -= promptEndsText(visibleText, this.prompt) ? 1 : 0;
     }
 
     if (this.completedExec && visibleText.includes(this.prompt)) {
@@ -464,21 +465,8 @@ function countPromptProducingControls(text: string) {
   return count;
 }
 
-function countOccurrences(text: string, search: string) {
-  let count = 0;
-  let index = 0;
-
-  while (index < text.length) {
-    const nextIndex = text.indexOf(search, index);
-    if (nextIndex === -1) {
-      return count;
-    }
-
-    count += 1;
-    index = nextIndex + search.length;
-  }
-
-  return count;
+function promptEndsText(text: string, prompt: string) {
+  return text.endsWith(prompt);
 }
 
 async function sleep(delayMs: number) {
