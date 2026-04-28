@@ -50,6 +50,13 @@ const paneFrameClassName =
 
 const ignoreTerminalInput = () => {};
 
+export function paneFrameDataAttributes(name: string, isCurrent: boolean) {
+  return {
+    "data-termdem-current": isCurrent ? "" : undefined,
+    "data-termdem-pane": name,
+  };
+}
+
 export function renderPreviewApp(demo: PreviewDemoModule) {
   const rootElement = document.getElementById("root");
   if (!rootElement) {
@@ -345,7 +352,11 @@ function PaneTerminalCard({
   }, [connectionKey, name, status]);
 
   return (
-    <article className={`${paneFrameClassName} ${className ?? ""}`} style={style}>
+    <article
+      {...paneFrameDataAttributes(name, false)}
+      className={`${paneFrameClassName} ${className ?? ""}`}
+      style={style}
+    >
       <header className="flex h-6 shrink-0 items-center border-b border-[#2f2f2f] bg-[#1b1b1b] px-2 font-mono text-[11px] font-semibold leading-none text-cyan-300">
         {name}
       </header>
