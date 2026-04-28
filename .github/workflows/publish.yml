@@ -29,9 +29,6 @@ jobs:
           node-version: "22"
           cache: true
 
-      - name: Set up npm for trusted publishing
-        run: npm install --global npm@latest
-
       - name: Set up pnpm
         run: npm install --global pnpm@10.33.1
 
