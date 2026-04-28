@@ -124,9 +124,12 @@ class NodePtyPaneSession implements PaneSession {
 
   async bootstrap() {
     await this.waitForPrompt();
-    this.pty.write(`${this.buildBootstrapCommand()}\r`);
     this.dataBuffer = "";
+    this.pty.write("stty -echo\r");
     await this.waitForPrompt();
+    this.dataBuffer = "";
+    this.pty.write(`${this.buildBootstrapCommand()}\r`);
+    await this.waitForPromptMarker();
 
     this.bootstrapping = false;
     this.dataBuffer = "";
@@ -134,13 +137,11 @@ class NodePtyPaneSession implements PaneSession {
   }
 
   private buildBootstrapCommand() {
-    const markerValue = `\u001e${this.promptMarker}\u001e`;
     const promptRecipe = `${this.prompt}$(printf '%s' "$${this.promptMarkerVariable}")`;
     return [
-      `${this.promptMarkerVariable}=${shQuote(markerValue)}`,
+      `${this.promptMarkerVariable}=$'\\036${this.promptMarker}\\036'`,
       `PS1=${shQuote(promptRecipe)}`,
       "PROMPT_COMMAND=",
-      "stty -echo",
     ].join("; ");
   }
 
@@ -426,6 +427,34 @@ class NodePtyPaneSession implements PaneSession {
 
         if (Date.now() - start >= timeoutMs) {
           reject(new Error(`Timed out waiting for prompt ${this.prompt}`));
+          return;
+        }
+
+        setTimeout(tick, 10);
+      };
+
+      tick();
+    });
+  }
+
+  private waitForPromptMarker(timeoutMs = 2000) {
+    const start = Date.now();
+    const marker = `\u001e${this.promptMarker}\u001e`;
+
+    return new Promise<void>((resolve, reject) => {
+      const tick = () => {
+        if (this.closed) {
+          reject(new Error("Pane session closed during bootstrap"));
+          return;
+        }
+
+        if (this.dataBuffer.includes(marker)) {
+          resolve();
+          return;
+        }
+
+        if (Date.now() - start >= timeoutMs) {
+          reject(new Error(`Timed out waiting for prompt marker ${this.promptMarker}`));
           return;
         }
 
