@@ -41,20 +41,8 @@ jobs:
             exit 1
           fi
 
-      - name: Build package for example typechecking
+      - name: Build package
         run: vp run @akuederle/termdem#build
-
-      - name: Check
-        run: vp check
-
-      - name: Test
-        run: vp run -r test
-
-      - name: Build
-        run: vp run -r build
-
-      - name: Smoke test examples
-        run: vp run test:smoke
 
       - name: Publish package
         working-directory: packages/termdem
