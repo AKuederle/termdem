@@ -25,12 +25,18 @@ test("pane sessions sendLine visibly starts a command without waiting for prompt
   });
 
   try {
-    await session.sendLine("printf ready; sleep 30", { typeDelayMs: 0 });
+    const sent = session.sendLine("printf ready; sleep 1; printf fin%shed is", {
+      typeDelayMs: 0,
+    });
+    await expect(
+      Promise.race([sent.then(() => "sent" as const), sleep(200).then(() => "waiting" as const)]),
+    ).resolves.toBe("sent");
     await waitFor(() => visibleOutput.join("").includes("ready"));
 
     const transcript = visibleOutput.join("");
-    expect(transcript).toContain("printf ready; sleep 30");
+    expect(transcript).toContain("printf ready; sleep 1; printf fin%shed is");
     expect(transcript).toContain("ready");
+    await waitFor(() => visibleOutput.join("").includes("finished"));
   } finally {
     await session.close();
   }
@@ -155,6 +161,7 @@ test("playbook runtime runs hidden lifecycle hooks around the visible script", a
         await api.pane("main").press(keys.CTRL_L);
         await api.pane("main").press(keys.ESC);
         await api.pane("main").press("Enter");
+        await api.pane("main").exec("true");
         return { message: result.text };
       },
       teardown: async (api, setupData) => {
@@ -244,4 +251,8 @@ async function waitFor(assertion: () => boolean, timeoutMs = 2_000) {
 
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
+}
+
+async function sleep(delayMs: number) {
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
