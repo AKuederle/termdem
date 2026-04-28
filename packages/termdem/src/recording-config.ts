@@ -13,12 +13,15 @@ export type DemoSize = {
  */
 export type RecordingConfig = {
   /**
-   * Final output video size.
-   *
-   * In preview, this size is also used as the fixed preview viewport when `viewportSize`
-   * is not provided.
+   * Demo viewport size.
    */
   size?: DemoSize;
+  /**
+   * Multiplier for the recording output size.
+   *
+   * Use this to record at a higher resolution while keeping the demo layout at `size`.
+   */
+  oversample?: number;
   /**
    * Default delay, in milliseconds, between visible typed characters.
    *
@@ -26,22 +29,17 @@ export type RecordingConfig = {
    * with their own `typeDelayMs` option.
    */
   typeDelayMs?: number;
-  /**
-   * Browser viewport size used for preview and raw recording.
-   *
-   * Set this when you want to compose the demo at one size and scale/pad it into a
-   * different final `size` during recording.
-   */
-  viewportSize?: DemoSize;
 };
 
 export type RecordingCliOptions = {
+  oversample?: string;
   size?: string;
-  viewportSize?: string;
 };
 
 export type ResolvedRecordingConfig = {
+  /** Recording output size passed to Playwright. */
   size: DemoSize;
+  /** Browser viewport size used to lay out the demo. */
   viewportSize: DemoSize;
 };
 
@@ -68,19 +66,33 @@ export function parseDemoSize(value: string): DemoSize {
   };
 }
 
+export function parseOversample(value: string): number {
+  const oversample = Number(value.trim());
+  if (!Number.isFinite(oversample) || oversample <= 0) {
+    throw new Error(`Invalid oversample "${value}". Expected a positive number, for example 2.`);
+  }
+
+  return oversample;
+}
+
 export function resolveRecordingConfig(
   demoConfig: RecordingConfig = {},
   cliOptions: RecordingCliOptions = {},
 ): ResolvedRecordingConfig {
-  const hasCliSize = Boolean(cliOptions.size);
   const size = cliOptions.size ? parseDemoSize(cliOptions.size) : (demoConfig.size ?? defaultSize);
+  const oversample = cliOptions.oversample
+    ? parseOversample(cliOptions.oversample)
+    : (demoConfig.oversample ?? 1);
 
   return {
-    size,
-    viewportSize: cliOptions.viewportSize
-      ? parseDemoSize(cliOptions.viewportSize)
-      : hasCliSize
-        ? size
-        : (demoConfig.viewportSize ?? size),
+    size: oversampledSize(size, oversample),
+    viewportSize: size,
+  };
+}
+
+function oversampledSize(size: DemoSize, oversample: number): DemoSize {
+  return {
+    height: Math.round(size.height * oversample),
+    width: Math.round(size.width * oversample),
   };
 }

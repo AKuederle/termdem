@@ -34,6 +34,8 @@ export const typingDelays = {
   WPM_80: 150,
   /** Fast typing for low-emphasis commands. */
   WPM_120: 100,
+  /** As fast as possible without triggering typical issue with key repeat */
+  WPM_MAX: 20,
 } as const;
 
 /**

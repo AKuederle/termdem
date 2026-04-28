@@ -162,8 +162,8 @@ function parseRecordArgs(args: readonly string[]): RecordCommand {
       continue;
     }
 
-    if (isViewportSizeFlag(arg)) {
-      cliOptions.viewportSize = readFlagValue(args, index, arg);
+    if (arg === "--oversample") {
+      cliOptions.oversample = readFlagValue(args, index, arg);
       index += 1;
       continue;
     }
@@ -177,7 +177,7 @@ function parseRecordArgs(args: readonly string[]): RecordCommand {
 
   if (positional.length !== 2) {
     throw new Error(
-      "Usage: termdem record <demo.tsx> <output.{webm|mp4}> [--size <width>x<height>] [--viewportSize <width>x<height>]",
+      "Usage: termdem record <demo.tsx> <output.{webm|mp4}> [--size <width>x<height>] [--oversample <factor>]",
     );
   }
 
@@ -200,14 +200,10 @@ function readFlagValue(args: readonly string[], index: number, flag: string) {
   return value;
 }
 
-function isViewportSizeFlag(arg: string) {
-  return arg === "--viewportSize" || arg === "--viewportsize" || arg === "--viewport-size";
-}
-
 function helpText() {
   return `Usage:
   termdem preview <demo.tsx>
-  termdem record <demo.tsx> <output.{webm|mp4}> [--size <width>x<height>] [--viewportSize <width>x<height>]
+  termdem record <demo.tsx> <output.{webm|mp4}> [--size <width>x<height>] [--oversample <factor>]
 `;
 }
 

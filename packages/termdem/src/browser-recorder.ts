@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rename, rm } from "node:fs/promises";
+import { copyFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
@@ -18,7 +18,6 @@ export type BrowserRecordingOptions = {
 };
 
 const defaultDoneTimeoutMs = 5 * 60 * 1000;
-const recordingLeadInMs = 500;
 const recordingStatusIntervalMs = 5_000;
 
 export async function recordBrowserPage(options: BrowserRecordingOptions): Promise<void> {
@@ -40,7 +39,6 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
       },
       viewport: options.viewportSize,
     });
-    const recordingStartedAt = Date.now();
     const page = await context.newPage();
     options.onProgress?.("Loading preview");
     await page.goto(recordingUrl(options.url));
@@ -52,9 +50,6 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
 
     options.onProgress?.("Waiting for terminal panes");
     await waitForRecordingReady(page);
-    const readyAt = Date.now();
-    await page.waitForTimeout(recordingLeadInMs);
-    const trimStartSeconds = Math.max(0, (readyAt - recordingStartedAt) / 1000 - 0.05);
     options.onProgress?.("Running demo script");
     await startRecordingDemo(page);
     await waitForRecordingDone(page, options);
@@ -65,17 +60,15 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
     if (
       videoNeedsTranscode({
         format,
-        trimStartSeconds,
       })
     ) {
       options.onProgress?.("Transcoding recording");
       await transcodeWebm(rawVideoPath, options.outputPath, {
         format,
         size: options.size,
-        trimStartSeconds,
       });
     } else {
-      await rename(rawVideoPath, options.outputPath);
+      await copyFile(rawVideoPath, options.outputPath);
     }
     options.onProgress?.(`Wrote ${options.outputPath}`);
   } finally {
@@ -84,15 +77,8 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
   }
 }
 
-export function videoNeedsTranscode(options: {
-  format: RecordingFormat;
-  trimStartSeconds?: number;
-}) {
+export function videoNeedsTranscode(options: { format: RecordingFormat }) {
   return options.format !== "webm";
-}
-
-export function sizesMatch(left: DemoSize, right: DemoSize) {
-  return left.width === right.width && left.height === right.height;
 }
 
 export function buildFfmpegTranscodeArgs(
@@ -101,14 +87,10 @@ export function buildFfmpegTranscodeArgs(
   size: DemoSize,
   options: {
     format?: RecordingFormat;
-    trimStartSeconds?: number;
   } = {},
 ) {
   const format = options.format ?? inferRecordingFormat(outputPath);
   const videoFilter = [
-    ...(options.trimStartSeconds && options.trimStartSeconds > 0
-      ? [`trim=start=${options.trimStartSeconds.toFixed(3)}`, "setpts=PTS-STARTPTS"]
-      : []),
     `scale=${size.width}:${size.height}:force_original_aspect_ratio=decrease`,
     `pad=${size.width}:${size.height}:(ow-iw)/2:(oh-ih)/2:color=black`,
     "setsar=1",
@@ -129,6 +111,7 @@ export function buildFfmpegTranscodeArgs(
 function recordingUrl(url: string) {
   const parsed = new URL(url);
   parsed.searchParams.set("termdem_autostart", "0");
+  parsed.searchParams.set("termdem_embedded", "1");
   return parsed.toString();
 }
 
@@ -209,7 +192,6 @@ async function transcodeWebm(
   options: {
     format: RecordingFormat;
     size: DemoSize;
-    trimStartSeconds: number;
   },
 ) {
   await new Promise<void>((resolve, reject) => {
@@ -217,7 +199,6 @@ async function transcodeWebm(
       "ffmpeg",
       buildFfmpegTranscodeArgs(inputPath, outputPath, options.size, {
         format: options.format,
-        trimStartSeconds: options.trimStartSeconds,
       }),
       (error) => {
         if (!error) {

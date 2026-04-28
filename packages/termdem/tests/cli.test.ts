@@ -30,29 +30,27 @@ test("parseTermdemCliArgs parses record commands and infers webm output", () => 
   });
 });
 
-test("parseTermdemCliArgs supports separate viewport size aliases", () => {
-  for (const flag of ["--viewportSize", "--viewportsize", "--viewport-size"]) {
-    expect(
-      parseTermdemCliArgs([
-        "record",
-        "demo.tsx",
-        "demo.mp4",
-        "--size",
-        "1920x1080",
-        flag,
-        "1440x900",
-      ]),
-    ).toEqual({
-      cliOptions: {
-        size: "1920x1080",
-        viewportSize: "1440x900",
-      },
-      command: "record",
-      demoPath: "demo.tsx",
-      format: "mp4",
-      outputPath: "demo.mp4",
-    });
-  }
+test("parseTermdemCliArgs supports recording oversample", () => {
+  expect(
+    parseTermdemCliArgs([
+      "record",
+      "demo.tsx",
+      "demo.mp4",
+      "--size",
+      "1920x1080",
+      "--oversample",
+      "2",
+    ]),
+  ).toEqual({
+    cliOptions: {
+      oversample: "2",
+      size: "1920x1080",
+    },
+    command: "record",
+    demoPath: "demo.tsx",
+    format: "mp4",
+    outputPath: "demo.mp4",
+  });
 });
 
 test("parseTermdemCliArgs rejects unknown commands and malformed record commands", () => {
@@ -107,8 +105,8 @@ test("runRecordCommand records the headless preview and closes the server", asyn
   await runRecordCommand(
     {
       cliOptions: {
+        oversample: "2",
         size: "1920x1080",
-        viewportSize: "1440x900",
       },
       command: "record",
       demoPath: "demo.tsx",
@@ -142,7 +140,7 @@ test("runRecordCommand records the headless preview and closes the server", asyn
 
   expect(events).toEqual([
     "preview:demo.tsx:false",
-    "record:http://127.0.0.1:5173/:demo.webm:1920x1080:1440x900",
+    "record:http://127.0.0.1:5173/:demo.webm:3840x2160:1920x1080",
     "close",
   ]);
 });

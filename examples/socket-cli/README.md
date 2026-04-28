@@ -20,9 +20,9 @@ The demo proves a dynamic workflow:
 This is the intended usage pattern for demos where one pane discovers runtime data and later panes
 depend on it.
 
-The demo config intentionally separates `size: 1920x1080` from `viewportSize: 1440x810` to document
-the record contract. The CLI can override both with `--size`, or override just the viewport with
-`--viewportSize` in addition to `--size`.
+The demo config uses `size: 1280x720` for the terminal viewport and `oversample: 1.5` to record at
+1920x1080 without changing terminal layout. The CLI can override these with `--size` and
+`--oversample`.
 
 This folder is a standalone workspace package. It depends on `@akuederle/termdem` as a dev
 dependency so `demo.tsx` imports the package exactly like a user project would.

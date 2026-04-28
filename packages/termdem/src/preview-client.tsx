@@ -98,7 +98,7 @@ function FixedPreviewFrame({ size }: { size: DemoSize }) {
 }
 
 export function previewFrameSize(config: RecordingConfig): DemoSize | null {
-  return config.viewportSize ?? config.size ?? null;
+  return config.size ?? null;
 }
 
 function syncEmbeddedPreviewState(iframe: HTMLIFrameElement | null) {

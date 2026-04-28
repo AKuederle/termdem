@@ -14,13 +14,7 @@ test("pane frame data attributes expose pane identity and presence-style current
   });
 });
 
-test("preview frame size prefers explicit viewport size over output size", () => {
-  expect(
-    previewFrameSize({
-      size: { height: 1080, width: 1920 },
-      viewportSize: { height: 720, width: 1280 },
-    }),
-  ).toEqual({ height: 720, width: 1280 });
+test("preview frame size uses the configured demo size", () => {
   expect(previewFrameSize({ size: { height: 720, width: 1280 } })).toEqual({
     height: 720,
     width: 1280,

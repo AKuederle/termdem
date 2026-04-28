@@ -10,9 +10,8 @@ Each example lives in its own folder with a README, `package.json`, `tsconfig.js
 - `socket-cli`: multi-pane CLI workflow where one command returns a random local socket URL that drives later panes.
 
 Recording size defaults live in each demo's `createTerminalDemo({ settings })` call. The
-`record` CLI supports `--size <width>x<height>` for the output video size and
-`--viewportSize <width>x<height>` when the browser viewport should differ from the recorded video.
-If only `--size` is passed, it applies to both recording and viewport size.
+`record` CLI supports `--size <width>x<height>` for the terminal viewport size and
+`--oversample <factor>` to record at a higher output resolution.
 WebM recording does not require ffmpeg. MP4 output requires `ffmpeg` on `PATH`.
 
 From an example package, the intended workflow is:

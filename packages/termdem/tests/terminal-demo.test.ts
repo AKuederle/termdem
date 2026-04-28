@@ -23,9 +23,9 @@ test("createTerminalDemo preserves backend terminal definitions and config", () 
     setup,
     teardown,
     settings: {
+      oversample: 1.5,
       size: { width: 1920, height: 1080 },
       typeDelayMs: 100,
-      viewportSize: { width: 1440, height: 900 },
     },
   });
 
@@ -36,9 +36,9 @@ test("createTerminalDemo preserves backend terminal definitions and config", () 
   expect("config" in demo).toBe(false);
   expect("terminalDefinitions" in demo).toBe(false);
   expect(demo.settings).toEqual({
+    oversample: 1.5,
     size: { width: 1920, height: 1080 },
     typeDelayMs: 100,
-    viewportSize: { width: 1440, height: 900 },
   });
 });
 

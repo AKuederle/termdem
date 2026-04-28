@@ -57,9 +57,9 @@ export const demo = createTerminalDemo({
     });
   },
   settings: {
-    size: { width: 1920, height: 1080 },
-    typeDelayMs: typingDelays.WPM_120,
-    viewportSize: { width: 1440, height: 810 },
+    oversample: 1.5,
+    size: { width: 1280, height: 720 },
+    typeDelayMs: typingDelays.WPM_MAX,
   },
 });
 
@@ -68,7 +68,7 @@ export function render(panes: TerminalPaneComponents<typeof demo>) {
     "transition data-[termdem-current]:z-10 data-[termdem-current]:ring-2 data-[termdem-current]:ring-cyan-300 data-[termdem-current]:brightness-110";
 
   return (
-    <main className="grid h-full w-full min-h-0 grid-cols-[1fr_1.1fr] grid-rows-2 gap-px bg-[#333] p-px">
+    <main className="grid h-full w-full min-h-0 grid-cols-[1fr_1.1fr] grid-rows-2 bg-[#333]">
       <panes.server className={`min-h-0 min-w-0 ${currentPaneClassName}`} />
       <panes.sender className={`row-start-2 min-h-0 min-w-0 ${currentPaneClassName}`} />
       <panes.listener
