@@ -30,7 +30,7 @@ jobs:
           cache: true
 
       - name: Set up pnpm
-        run: corepack enable && corepack prepare pnpm@10.33.1 --activate
+        run: npm install --global pnpm@10.33.1
 
       - name: Check release tag matches package version
         run: |
