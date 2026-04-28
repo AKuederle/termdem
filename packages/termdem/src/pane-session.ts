@@ -207,6 +207,10 @@ class NodePtyPaneSession implements PaneSession {
   }
 
   private async performTypeHidden(text: string, options: TypeOptions = {}) {
+    if (submitsOrControlsTerminal(text)) {
+      this.hideOutputUntilPrompt();
+    }
+
     for (const char of text) {
       this.pty.write(char);
       await sleep(options.typeDelayMs ?? typingDelays.WPM_60);
@@ -441,6 +445,15 @@ function nextAlternateScreenState(current: boolean, text: string) {
   }
 
   return next;
+}
+
+function submitsOrControlsTerminal(text: string) {
+  return (
+    text.includes("\r") ||
+    text.includes("\n") ||
+    text.includes(String.fromCharCode(3)) ||
+    text.includes(String.fromCharCode(4))
+  );
 }
 
 async function sleep(delayMs: number) {
