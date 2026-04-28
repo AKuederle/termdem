@@ -267,6 +267,30 @@ test("playbook runtime stop cancels a paused run", async () => {
   expect(states).not.toContain("done");
 });
 
+test("playbook runtime keeps pane resize requests made during restart", async () => {
+  const states: string[] = [];
+  const runtime = new PlaybookRuntime({
+    onPlaybookState(state) {
+      states.push(state.state);
+    },
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
+    typeDelayMs: 0,
+  });
+  const first = runtime.run(async (api) => {
+    await api.wait(5_000);
+  });
+
+  await waitFor(() => states.includes("running"));
+  const restart = runtime.restart(async (api) => {
+    await api.pane("main").exec("printf restarted", { typeDelayMs: 0 });
+  });
+  await runtime.resizePane("main", 100, 32);
+  await first;
+  await restart;
+
+  expect(states.at(-1)).toBe("done");
+});
+
 test("playbook runtime pause can stop and resume visible typing mid-action", async () => {
   const visibleOutput: string[] = [];
   const states: string[] = [];

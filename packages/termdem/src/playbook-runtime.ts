@@ -68,6 +68,7 @@ export type PlaybookLifecycle<Name extends string, SetupData = undefined> = {
 export class PlaybookRuntime<Name extends string = string> {
   private readonly options: PlaybookRuntimeOptions;
   private readonly panes = new Map<string, ManagedPane>();
+  private readonly paneSizes = new Map<string, { cols: number; rows: number }>();
   private activeRun: Promise<void> | null = null;
   private generation = 0;
   private closed = false;
@@ -88,8 +89,9 @@ export class PlaybookRuntime<Name extends string = string> {
       const workspace = await createTerminalWorkspace(terminal);
       const prompt = `(${terminal.name}) $ `;
       const shell = this.options.shell ?? process.env.TERMDEM_SHELL ?? "/bin/bash";
+      const size = this.paneSizes.get(terminal.name) ?? { cols: 20, rows: 8 };
       const session = await createPaneSession({
-        cols: 20,
+        cols: size.cols,
         cwd: workspace.cwd,
         onOutput: (data) => {
           if (this.hiddenPaneOutputDepth > 0) {
@@ -99,7 +101,7 @@ export class PlaybookRuntime<Name extends string = string> {
           this.options.onPaneOutput?.({ data, pane: terminal.name });
         },
         prompt,
-        rows: 8,
+        rows: size.rows,
         shell,
       });
 
@@ -177,7 +179,14 @@ export class PlaybookRuntime<Name extends string = string> {
   }
 
   async resizePane(pane: string, cols: number, rows: number) {
-    await this.readyPane(pane).resize(cols, rows);
+    const size = { cols: Math.max(20, Math.floor(cols)), rows: Math.max(8, Math.floor(rows)) };
+    this.paneSizes.set(pane, size);
+    const readyPane = this.panes.get(pane);
+    if (!readyPane) {
+      return;
+    }
+
+    await readyPane.session.resize(size.cols, size.rows);
   }
 
   async inputPane(pane: string, data: string) {
