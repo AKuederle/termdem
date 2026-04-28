@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed preview browser bundling for demo modules that import Node builtins at module scope.
 - Fixed the published package's Vite dependency to resolve to real Vite instead of Vite Plus core.
 
 ## [0.1.0] - 2026-04-28

@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { builtinModules, createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,6 +35,10 @@ type PreviewDemoModule = Partial<TerminalDemo<readonly TerminalWorkspaceDefiniti
 
 const bridgeToken = randomBytes(24).toString("hex");
 const socketOpenState = 1;
+const require = createRequire(import.meta.url);
+const nodeBuiltinNames = new Set(
+  builtinModules.flatMap((name) => (name.startsWith("node:") ? [name] : [name, `node:${name}`])),
+);
 
 type PreviewSendSocket = Pick<WebSocket, "readyState" | "send">;
 
@@ -154,6 +159,7 @@ export async function startPreviewServer(
       },
       root,
       plugins: [
+        nodeBuiltinsBrowserExternal(),
         termdemClientShim({
           clientShimPath,
           reactJsxDevRuntimeSsrShimPath,
@@ -276,6 +282,69 @@ function ptyBridge({ demoPath }: { demoPath: string }): Plugin {
       ];
     },
   };
+}
+
+export function nodeBuiltinsBrowserExternal(): Plugin {
+  const virtualPrefix = "\0termdem-node-builtin-browser-external:";
+
+  return {
+    name: "termdem-node-builtins-browser-external",
+    resolveId(source, _importer, options) {
+      if (options?.ssr || !nodeBuiltinNames.has(source)) {
+        return;
+      }
+
+      return `${virtualPrefix}${normalizeBuiltinName(source)}`;
+    },
+    load(id) {
+      if (!id.startsWith(virtualPrefix)) {
+        return;
+      }
+
+      return nodeBuiltinBrowserExternalSource(id.slice(virtualPrefix.length));
+    },
+  };
+}
+
+export function nodeBuiltinBrowserExternalSource(moduleName: string) {
+  const errorMessage = nodeBuiltinBrowserErrorMessage(moduleName);
+  const namedExports = nodeBuiltinExportNames(moduleName)
+    .map((name) => `export const ${name} = __termdemNodeBuiltinUnavailable;`)
+    .join("\n");
+
+  return `const __termdemNodeBuiltinUnavailable = new Proxy(function unavailableNodeBuiltin() {
+  throw new Error(${JSON.stringify(errorMessage)});
+}, {
+  construct() {
+    throw new Error(${JSON.stringify(errorMessage)});
+  },
+  get() {
+    throw new Error(${JSON.stringify(errorMessage)});
+  },
+});
+
+${namedExports}
+export default __termdemNodeBuiltinUnavailable;
+`;
+}
+
+function normalizeBuiltinName(moduleName: string) {
+  return moduleName.startsWith("node:") ? moduleName.slice("node:".length) : moduleName;
+}
+
+function nodeBuiltinExportNames(moduleName: string) {
+  const builtin = require(normalizeBuiltinName(moduleName)) as Record<string, unknown>;
+  return Object.keys(builtin)
+    .filter((name) => name !== "default" && isJavaScriptIdentifier(name))
+    .sort();
+}
+
+function isJavaScriptIdentifier(value: string) {
+  return /^[$A-Z_a-z][$\w]*$/.test(value);
+}
+
+function nodeBuiltinBrowserErrorMessage(moduleName: string) {
+  return `Node builtin "${moduleName}" is not available in the termdem preview browser bundle. Move Node-only code into setup, teardown, or script callbacks, and load it with a dynamic import when it runs on the preview server.`;
 }
 
 async function wirePreviewClient({

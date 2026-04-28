@@ -2,6 +2,8 @@ import { expect, test } from "vite-plus/test";
 import { createTerminalDemo, TmpDir } from "../src/index.ts";
 import {
   clientShimSource,
+  nodeBuiltinBrowserExternalSource,
+  nodeBuiltinsBrowserExternal,
   previewEntrySource,
   resetPreviewReplayState,
 } from "../src/preview-server.ts";
@@ -101,6 +103,37 @@ test("preview entry imports demo through a named export", () => {
   expect(source).not.toContain("terminalDefinitions");
   expect(source).not.toContain("config: demo.config");
   expect(source).not.toContain("import demo");
+});
+
+test("preview Vite config externalizes Node builtins from the browser bundle", async () => {
+  const plugin = nodeBuiltinsBrowserExternal();
+  const { resolveId } = plugin;
+  type ResolveIdHook = (
+    this: unknown,
+    source: string,
+    importer: string | undefined,
+    options: { ssr?: boolean },
+  ) => unknown;
+
+  if (typeof resolveId !== "function") {
+    throw new Error("Expected node builtin external plugin to expose a resolveId hook");
+  }
+
+  const resolve = resolveId as ResolveIdHook;
+
+  expect(resolve.call(undefined, "node:dgram", undefined, { ssr: false })).toBe(
+    "\0termdem-node-builtin-browser-external:dgram",
+  );
+  expect(resolve.call(undefined, "node:dgram", undefined, { ssr: true })).toBeUndefined();
+});
+
+test("browser Node builtin external exports named throwing placeholders", () => {
+  const source = nodeBuiltinBrowserExternalSource("dgram");
+
+  expect(source).toContain("export const createSocket = __termdemNodeBuiltinUnavailable;");
+  expect(source).toContain("export default __termdemNodeBuiltinUnavailable;");
+  expect(source).toContain("Node builtin");
+  expect(source).toContain("dgram");
 });
 
 test("preview replay reset clears stale pane state and output buffers", () => {
