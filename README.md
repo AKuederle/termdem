@@ -82,7 +82,7 @@ Note, that for `TmpDir`, `teardown` is usually not required, as we just delete t
 The second level are the `setup` and `teardown` funcs that can be passed to `createTerminalDemo`.
 They work like the script callback and have access to the same functionality, with two distinctions.
 The commands are not displayed on the frontend and the default `typingDelay` is set to 0 ms/typing simulation for `exec` is turned off to speed up the execution.
-The setup func can return a data object that will be provided as a second argument to the `script`
+The setup func can return a data object that will be provided as a second argument to the `script`.
 
 ## How it works
 
