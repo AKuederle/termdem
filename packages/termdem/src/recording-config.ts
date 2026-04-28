@@ -1,11 +1,37 @@
+/**
+ * Pixel dimensions for a preview viewport or output video.
+ */
 export type DemoSize = {
+  /** Height in CSS pixels. */
   height: number;
+  /** Width in CSS pixels. */
   width: number;
 };
 
+/**
+ * Recording and preview configuration for a demo.
+ */
 export type RecordingConfig = {
+  /**
+   * Final output video size.
+   *
+   * In preview, this size is also used as the fixed preview viewport when `viewportSize`
+   * is not provided.
+   */
   size?: DemoSize;
+  /**
+   * Default delay, in milliseconds, between visible typed characters.
+   *
+   * Individual `pane.type()`, `pane.exec()`, and `pane.sendLine()` calls can override this
+   * with their own `typeDelayMs` option.
+   */
   typeDelayMs?: number;
+  /**
+   * Browser viewport size used for preview and raw recording.
+   *
+   * Set this when you want to compose the demo at one size and scale/pad it into a
+   * different final `size` during recording.
+   */
   viewportSize?: DemoSize;
 };
 
