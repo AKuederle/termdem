@@ -28,6 +28,8 @@ Create one `.tsx` file per demo, export the `demo` returned by `createTerminalDe
 2. Create a folder for your demos.
 3. Add a `.tsx` demo file.
 4. Configure panes, write the script, and render the scene.
+5. Preview the demo in your browser with `npx termdem preview ./demos/demo.tsx`.
+6. Record the demo to a video file with `npx termdem record ./demos/demo.tsx ./demo.webm`.
 
 ### Create a Scene
 
@@ -68,7 +70,9 @@ Use `api.pane(name)` to select a pane and then drive it with `exec`, `sendLine`,
 Use normal JavaScript between terminal actions whenever you need to parse output or decide the next command.
 
 ```ts
-import { quoteShellArg } from "@akuederle/termdem";
+import { TmpDir, createTerminalDemo, quoteShellArg } from "@akuederle/termdem";
+
+const workspace = new TmpDir({});
 
 export const demo = createTerminalDemo({
   panes: [
