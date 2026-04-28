@@ -85,7 +85,7 @@ Use `api.pane(name)` to select a pane and then drive it with `exec`, `sendLine`,
 Use normal JavaScript between terminal actions whenever you need to parse output or decide the next command.
 
 ```ts
-import { TmpDir, createTerminalDemo, quoteShellArg } from "@akuederle/termdem";
+import { TmpDir, createTerminalDemo, quoteShellArg, typedString } from "@akuederle/termdem";
 
 const workspace = new TmpDir();
 
@@ -105,7 +105,10 @@ export const demo = createTerminalDemo({
       throw new Error("Server did not print a URL");
     }
 
-    await server.sendLine(`node scripts/server.mjs listen ${quoteShellArg(url)}`);
+    await server.sendLine([
+      "node scripts/server.mjs listen ",
+      typedString(quoteShellArg(url), { typeDelayMs: 0 }),
+    ]);
     await api.waitFor("server ready", async () => {
       const result = await api.node.exec("curl", ["-fsS", url], {
         reject: false,
@@ -115,7 +118,10 @@ export const demo = createTerminalDemo({
       return result.exitCode === 0;
     });
 
-    await client.exec(`node scripts/client.mjs ${quoteShellArg(url)}`);
+    await client.exec([
+      "node scripts/client.mjs ",
+      typedString(quoteShellArg(url), { typeDelayMs: 0 }),
+    ]);
   },
 });
 ```
@@ -197,6 +203,10 @@ await pane.press(keys.ENTER);
 
 Typing speed is controlled by `typeDelayMs`, either globally in `settings` or per command/input call.
 Setup and teardown default to instant input, but visible interactive apps sometimes need a small delay because terminals can drop or reorder keypresses that arrive too quickly.
+Use `typedString()` when one part of an input should use a different speed, such as typing a command prefix and pasting a generated argument.
+Raw string segments use the command/input `typeDelayMs`, then the demo-level `settings.typeDelayMs`, then the built-in default.
+`typedString()` segments inherit that same delay unless they provide their own `typeDelayMs`.
+Segments are concatenated exactly, so include spaces in the strings where the final terminal input needs spaces.
 
 ```ts
 settings: {
@@ -205,6 +215,10 @@ settings: {
 
 await pane.exec("npm test", { typeDelayMs: 0 });
 await pane.type("iTyped into Vim\n", { typeDelayMs: typingDelays.WPM_60 });
+await pane.exec(
+  ["node scripts/client.mjs ", typedString(quoteShellArg(url), { typeDelayMs: 0 })],
+  { typeDelayMs: typingDelays.WPM_80 },
+);
 ```
 
 ### Parsing command outputs

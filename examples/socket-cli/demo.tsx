@@ -2,6 +2,7 @@ import {
   Dir,
   createTerminalDemo,
   quoteShellArg,
+  typedString,
   typingDelays,
   type TerminalPaneComponents,
 } from "@akuederle/termdem";
@@ -33,7 +34,10 @@ export const demo = createTerminalDemo({
     const setup = await server.exec("node scripts/server.mjs setup");
     const url = parseChatUrl(setup.text);
 
-    await listener.sendLine(`node scripts/client.mjs listen ${quoteShellArg(url)}`);
+    await listener.sendLine([
+      "node scripts/client.mjs listen ",
+      typedString(quoteShellArg(url), { typeDelayMs: 0 }),
+    ]);
     await api.waitFor("listener ready", async () => {
       const result = await api.node.exec("node", ["scripts/server.mjs", "health", url], {
         cwd: workspacePath,
@@ -44,9 +48,11 @@ export const demo = createTerminalDemo({
       return result.exitCode === 0 && result.stdout.includes("listener ready");
     });
 
-    await sender.exec(
-      `node scripts/client.mjs send ${quoteShellArg(url)} ${quoteShellArg("hello")}`,
-    );
+    await sender.exec([
+      "node scripts/client.mjs send ",
+      typedString(quoteShellArg(url), { typeDelayMs: 0 }),
+      ` ${quoteShellArg("hello")}`,
+    ]);
     await sender.exec(
       `node scripts/client.mjs send ${quoteShellArg(url)} ${quoteShellArg("message from sender pane")}`,
     );

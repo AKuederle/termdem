@@ -19,6 +19,7 @@ import type {
   TypeOptions,
   WaitForOptions,
 } from "./types.ts";
+import { typableTextValue, type TypableText } from "./typed-string.ts";
 import {
   createTerminalWorkspace,
   type TerminalWorkspace,
@@ -333,10 +334,10 @@ export class PlaybookRuntime<Name extends string = string> {
 
         return this.options.readPaneScreen(name);
       },
-      exec: async (command: string, options?: ExecOptions): Promise<ExecResult> => {
+      exec: async (command: TypableText, options?: ExecOptions): Promise<ExecResult> => {
         await this.ensureActive(generation, actionName("exec"));
         if (controllerOptions.hiddenPaneExec) {
-          return this.readyPane(name).execHidden(command);
+          return this.readyPane(name).execHidden(typableTextValue(command));
         }
         return this.readyPane(name).exec(command, withExecCheckpoint(options));
       },
@@ -348,7 +349,7 @@ export class PlaybookRuntime<Name extends string = string> {
         }
         await this.readyPane(name).press(key);
       },
-      sendLine: async (command: string, options?: TypeOptions): Promise<void> => {
+      sendLine: async (command: TypableText, options?: TypeOptions): Promise<void> => {
         await this.ensureActive(generation, actionName("sendLine"));
         if (controllerOptions.hiddenPaneExec) {
           await this.readyPane(name).sendLineHidden(command);
@@ -356,7 +357,7 @@ export class PlaybookRuntime<Name extends string = string> {
         }
         await this.readyPane(name).sendLine(command, withDefaultTypeDelay(options));
       },
-      type: async (text: string, options?: TypeOptions): Promise<void> => {
+      type: async (text: TypableText, options?: TypeOptions): Promise<void> => {
         await this.ensureActive(generation, actionName("type"));
         if (controllerOptions.hiddenPaneExec) {
           await this.readyPane(name).typeHidden(text, withDefaultTypeDelay(options));

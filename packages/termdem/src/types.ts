@@ -101,6 +101,11 @@ export interface PaneController {
    *
    * Use this for interactive programs where the script should not submit a complete
    * shell command, such as typing inside Vim or responding to a prompt.
+   * Pass an array of strings and `typedString()` values to mix typing speeds. Raw
+   * string segments use this call's `typeDelayMs`, then the demo-level `typeDelayMs`,
+   * then the built-in default. `typedString()` segments inherit that same delay unless
+   * they provide their own `typeDelayMs`. Segments are concatenated exactly, so include
+   * spaces where the terminal input needs spaces.
    *
    * @param text - The exact text or terminal key sequence to send.
    * @param options - Optional typing speed settings for this input.
@@ -134,6 +139,12 @@ export interface PaneController {
    *
    * Use `exec()` when later script steps need the command result. Use `sendLine()`
    * instead for long-running commands that should keep running while the demo continues.
+   * Pass an array of strings and `typedString()` values to mix typing speeds, for
+   * example typing a command prefix slowly and pasting an argument instantly. Raw
+   * string segments use this command's `typeDelayMs`, then the demo-level
+   * `typeDelayMs`, then the built-in default. `typedString()` segments inherit that
+   * same delay unless they provide their own `typeDelayMs`. Segments are concatenated
+   * exactly into the shell command, so include spaces between segments where needed.
    *
    * @param command - The shell command to show and run in this pane.
    * @param options - Optional typing speed settings for the visible command text.
@@ -152,6 +163,11 @@ export interface PaneController {
    *
    * Use this for servers, watchers, editors, and other foreground processes that should
    * remain active while the script sends later input or uses other panes.
+   * Pass an array of strings and `typedString()` values to mix typing speeds. Raw
+   * string segments use this call's `typeDelayMs`, then the demo-level `typeDelayMs`,
+   * then the built-in default. `typedString()` segments inherit that same delay unless
+   * they provide their own `typeDelayMs`. Segments are concatenated exactly before
+   * Enter is sent, so include spaces between segments where needed.
    *
    * @param command - The shell command to type and submit.
    * @param options - Optional typing speed settings for the visible command text.
