@@ -29,6 +29,9 @@ jobs:
           node-version: "22"
           cache: true
 
+      - name: Set up pnpm
+        run: corepack enable && corepack prepare pnpm@10.33.1 --activate
+
       - name: Check release tag matches package version
         run: |
           VERSION="$(node -p "require('./packages/termdem/package.json').version")"
