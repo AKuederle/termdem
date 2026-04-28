@@ -546,8 +546,11 @@ function PreviewOverlay({
   const controls = previewControlViewState({ pendingCommand, playbookState, socketStatus });
 
   return (
-    <div className="fixed right-4 top-4 z-50 flex items-center gap-1 rounded bg-black/85 p-1.5 font-mono text-xs text-white shadow-lg ring-1 ring-white/10">
-      <span className="min-w-20 px-2 text-slate-300">
+    <div
+      className="fixed right-5 top-5 z-50 flex items-center gap-2 rounded bg-black/85 p-2 font-mono text-white shadow-lg ring-1 ring-white/10"
+      style={{ fontSize: 14 }}
+    >
+      <span className="px-2 text-slate-300" style={{ minWidth: 96 }}>
         {socketStatus === "open" ? playbookState : socketStatus}
       </span>
       <IconButton
@@ -607,7 +610,7 @@ function IconButton({
   pending?: boolean;
 }) {
   const className = [
-    "grid h-8 w-8 place-items-center rounded border transition",
+    "grid place-items-center rounded border leading-none transition",
     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300",
     active
       ? "border-cyan-300 bg-cyan-500/30 text-cyan-100"
@@ -621,6 +624,7 @@ function IconButton({
       aria-label={label}
       className={className}
       disabled={disabled}
+      style={{ fontSize: 24, height: 48, width: 48 }}
       title={label}
       type="button"
       onClick={onClick}
