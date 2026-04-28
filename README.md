@@ -125,6 +125,20 @@ See the full [Git/Vim example](./examples/git-vim/demo.tsx) for an interactive f
 
 ## Tips
 
+### Scale terminal content
+
+Use `zoom` to scale terminal font size while keeping `size` as the video output size.
+For a higher-resolution video with similarly readable text, increase `size` and `zoom` by the
+same factor. For example, moving from `1280x720` to `2560x1440` with `zoom: 2` keeps the terminal
+content visually comparable while producing a larger video.
+
+```ts
+settings: {
+  size: { width: 1280, height: 720 },
+  zoom: 1.5,
+}
+```
+
 ### Highlight the active terminal
 
 Every pane component receives a `data-termdem-current` attribute while it is the pane currently controlled by the script.

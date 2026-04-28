@@ -148,8 +148,10 @@ function ptyBridge({ demoPath }: { demoPath: string }): Plugin {
   let runtime: PlaybookRuntime | null = null;
   const clients = new Set<WebSocket>();
   const latestMessages = new Map<string, ServerToBrowserMessage>();
+  const paneOutputBuffers = new Map<string, string>();
 
   const broadcast = (message: ServerToBrowserMessage) => {
+    rememberPaneOutput(paneOutputBuffers, message);
     rememberLatestMessage(latestMessages, message);
     for (const client of clients) {
       sendPreviewMessage(client, message);
@@ -186,6 +188,7 @@ function ptyBridge({ demoPath }: { demoPath: string }): Plugin {
             demoPath,
             getRuntime: () => runtime,
             latestMessages,
+            paneOutputBuffers,
             saveRuntime(nextRuntime) {
               runtime = nextRuntime;
             },
@@ -221,6 +224,7 @@ async function wirePreviewClient({
   demoPath,
   getRuntime,
   latestMessages,
+  paneOutputBuffers,
   saveRuntime,
   viteServer,
   ws,
@@ -230,6 +234,7 @@ async function wirePreviewClient({
   demoPath: string;
   getRuntime: () => PlaybookRuntime | null;
   latestMessages: Map<string, ServerToBrowserMessage>;
+  paneOutputBuffers: Map<string, string>;
   saveRuntime: (runtime: PlaybookRuntime) => void;
   viteServer: ViteDevServer;
   ws: WebSocket;
@@ -280,6 +285,11 @@ async function wirePreviewClient({
 
     for (const message of latestMessages.values()) {
       sendPreviewMessage(ws, message);
+    }
+    for (const [pane, data] of paneOutputBuffers) {
+      if (data !== "") {
+        sendPreviewMessage(ws, { type: "pane.output", pane, data });
+      }
     }
 
     return { demo, runtime: activeRuntime };
@@ -363,6 +373,20 @@ function sendPreviewMessage(ws: WebSocket, message: ServerToBrowserMessage) {
   }
 
   ws.send(JSON.stringify(message));
+}
+
+const maxPaneOutputBufferLength = 200_000;
+
+function rememberPaneOutput(
+  paneOutputBuffers: Map<string, string>,
+  message: ServerToBrowserMessage,
+) {
+  if (message.type !== "pane.output") {
+    return;
+  }
+
+  const next = `${paneOutputBuffers.get(message.pane) ?? ""}${message.data}`;
+  paneOutputBuffers.set(message.pane, next.slice(-maxPaneOutputBufferLength));
 }
 
 function rememberLatestMessage(

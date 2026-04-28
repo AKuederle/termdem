@@ -59,6 +59,7 @@ export const demo = createTerminalDemo({
   settings: {
     size: { width: 1280, height: 720 },
     typeDelayMs: typingDelays.WPM_MAX,
+    zoom: 1.5,
   },
 });
 

@@ -23,6 +23,13 @@ export type RecordingConfig = {
    * with their own `typeDelayMs` option.
    */
   typeDelayMs?: number;
+  /**
+   * Terminal font scale.
+   *
+   * Use values above 1 to make terminal text larger while keeping one explicit viewport/output
+   * size.
+   */
+  zoom?: number;
 };
 
 export type RecordingCliOptions = {

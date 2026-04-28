@@ -11,6 +11,7 @@ Each example lives in its own folder with a README, `package.json`, `tsconfig.js
 
 Recording size defaults live in each demo's `createTerminalDemo({ settings })` call. The
 `record` CLI supports `--size <width>x<height>` for the browser viewport and output video size.
+Use `zoom` in demo settings to make terminal text larger without changing the output dimensions.
 WebM recording does not require ffmpeg. MP4 output requires `ffmpeg` on `PATH`.
 
 From an example package, the intended workflow is:

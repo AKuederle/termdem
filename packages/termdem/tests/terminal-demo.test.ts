@@ -25,6 +25,7 @@ test("createTerminalDemo preserves backend terminal definitions and config", () 
     settings: {
       size: { width: 1920, height: 1080 },
       typeDelayMs: 100,
+      zoom: 1.5,
     },
   });
 
@@ -37,6 +38,7 @@ test("createTerminalDemo preserves backend terminal definitions and config", () 
   expect(demo.settings).toEqual({
     size: { width: 1920, height: 1080 },
     typeDelayMs: 100,
+    zoom: 1.5,
   });
 });
 

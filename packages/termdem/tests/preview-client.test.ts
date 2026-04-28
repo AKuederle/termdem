@@ -1,5 +1,10 @@
 import { expect, test } from "vite-plus/test";
-import { paneFrameDataAttributes, previewFrameSize } from "../src/preview-client.tsx";
+import {
+  paneFrameDataAttributes,
+  previewPaneHeaderStyle,
+  previewFrameSize,
+  previewZoomStyle,
+} from "../src/preview-client.tsx";
 import { queueOrSendPreviewMessage } from "../src/preview-socket.ts";
 
 test("pane frame data attributes expose pane identity and presence-style current state", () => {
@@ -20,6 +25,30 @@ test("preview frame size uses the configured demo size", () => {
     width: 1280,
   });
   expect(previewFrameSize({})).toBeNull();
+});
+
+test("preview zoom style scales the terminal font size", () => {
+  expect(previewZoomStyle({ size: { height: 720, width: 1280 }, zoom: 1.5 })).toEqual({
+    "--term-font-size": "21px",
+    "--term-row-height": "26px",
+    padding: 0,
+  });
+  expect(previewZoomStyle({})).toEqual({
+    "--term-font-size": "14px",
+    "--term-row-height": "17px",
+    padding: 0,
+  });
+});
+
+test("preview pane header style scales with terminal zoom", () => {
+  expect(previewPaneHeaderStyle({ zoom: 1.5 })).toEqual({
+    fontSize: "16.5px",
+    height: "36px",
+  });
+  expect(previewPaneHeaderStyle({})).toEqual({
+    fontSize: "11px",
+    height: "24px",
+  });
 });
 
 test("preview socket messages queue before the websocket is open", () => {

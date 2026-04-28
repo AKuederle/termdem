@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from "react";
 import { createRoot } from "react-dom/client";
@@ -36,7 +37,12 @@ const paneFrameClassName =
   "flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#101010] text-slate-100";
 
 const CurrentPaneNameContext = createContext<string | null>(null);
+const PreviewSettingsContext = createContext<RecordingConfig>({});
 const PreviewSocketContext = createContext<PreviewSocketContextValue | null>(null);
+const defaultPaneHeaderFontSizePx = 11;
+const defaultPaneHeaderHeightPx = 24;
+const defaultTerminalFontSizePx = 14;
+const defaultTerminalLineHeight = 1.2;
 
 export function paneFrameDataAttributes(name: string, isCurrent: boolean) {
   return {
@@ -269,9 +275,11 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
 
   return (
     <PreviewSocketContext value={socketContext}>
-      <CurrentPaneNameContext value={currentPaneName}>
-        {demo.render(paneComponents)}
-      </CurrentPaneNameContext>
+      <PreviewSettingsContext value={demo.settings}>
+        <CurrentPaneNameContext value={currentPaneName}>
+          {demo.render(paneComponents)}
+        </CurrentPaneNameContext>
+      </PreviewSettingsContext>
       {overlayVisible ? (
         <PreviewOverlay
           mode={socketStatus}
@@ -287,6 +295,31 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   );
 }
 
+type TerminalZoomStyle = CSSProperties & {
+  "--term-font-size": string;
+  "--term-row-height": string;
+};
+
+export function previewZoomStyle(config: RecordingConfig): TerminalZoomStyle {
+  const zoom = config.zoom ?? 1;
+  const fontSizePx = defaultTerminalFontSizePx * zoom;
+  const rowHeightPx = Math.ceil(fontSizePx * defaultTerminalLineHeight);
+
+  return {
+    padding: 0,
+    "--term-font-size": `${fontSizePx}px`,
+    "--term-row-height": `${rowHeightPx}px`,
+  };
+}
+
+export function previewPaneHeaderStyle(config: RecordingConfig): CSSProperties {
+  const zoom = config.zoom ?? 1;
+  return {
+    fontSize: `${defaultPaneHeaderFontSizePx * zoom}px`,
+    height: `${defaultPaneHeaderHeightPx * zoom}px`,
+  };
+}
+
 function PaneTerminalCard({
   className,
   name,
@@ -297,6 +330,8 @@ function PaneTerminalCard({
   style?: TerminalPaneProps["style"];
 }) {
   const currentPaneName = useContext(CurrentPaneNameContext);
+  const previewSettings = useContext(PreviewSettingsContext);
+  const embeddedPreview = useInitialValue(readEmbeddedPreview);
   const previewSocket = usePreviewSocket();
   const { ref, write } = useTerminal();
   const [status, setStatus] = useState("connecting");
@@ -328,7 +363,10 @@ function PaneTerminalCard({
       className={`${paneFrameClassName} ${className ?? ""}`}
       style={style}
     >
-      <header className="flex h-6 shrink-0 items-center border-b border-[#2f2f2f] bg-[#1b1b1b] px-2 font-mono text-[11px] font-semibold leading-none text-cyan-300">
+      <header
+        className="flex shrink-0 items-center border-b border-[#2f2f2f] bg-[#1b1b1b] px-2 font-mono font-semibold leading-none text-cyan-300"
+        style={previewPaneHeaderStyle(previewSettings)}
+      >
         {name}
       </header>
 
@@ -337,12 +375,15 @@ function PaneTerminalCard({
         aria-label={`${name} terminal (${status})`}
         className="min-h-0 flex-1 overflow-hidden !rounded-none"
         cols={20}
-        rows={8}
-        style={{ padding: 0 }}
+        rows={1}
+        style={previewZoomStyle(previewSettings)}
         theme="monokai"
         autoResize
         cursorBlink
         onData={(data) => {
+          if (embeddedPreview) {
+            return;
+          }
           previewSocket.send({ type: "pane.input", pane: name, data });
         }}
         onResize={(cols, rows) => {

@@ -59,8 +59,9 @@ export const demo = createTerminalDemo({
     await api.wait(800);
   },
   settings: {
-    size: { width: 1920, height: 1080 },
+    size: { width: 1280, height: 720 },
     typeDelayMs: typingDelays.WPM_MAX,
+    zoom: 1.5,
   },
 });
 

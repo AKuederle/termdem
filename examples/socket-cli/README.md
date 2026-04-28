@@ -20,8 +20,8 @@ The demo proves a dynamic workflow:
 This is the intended usage pattern for demos where one pane discovers runtime data and later panes
 depend on it.
 
-The demo config uses `size: 1920x1080` for both the browser viewport and output video size.
-The CLI can override this with `--size`.
+The demo config uses `size: 1280x720` for both the browser viewport and output video size, with
+`zoom: 1.5` to make terminal text easier to read. The CLI can override the size with `--size`.
 
 This folder is a standalone workspace package. It depends on `@akuederle/termdem` as a dev
 dependency so `demo.tsx` imports the package exactly like a user project would.
