@@ -318,7 +318,7 @@ async function handleBrowserMessage(
     case "playbook.start":
     case "playbook.resume":
       if (demo.script) {
-        await runtime.run(demo.script);
+        await runtime.run(demo.script, { setup: demo.setup, teardown: demo.teardown });
       }
       return;
     case "playbook.pause":
@@ -327,7 +327,7 @@ async function handleBrowserMessage(
       return;
     case "playbook.restart":
       if (demo.script) {
-        await runtime.restart(demo.script);
+        await runtime.restart(demo.script, { setup: demo.setup, teardown: demo.teardown });
       }
       return;
     default:
@@ -586,10 +586,13 @@ export class TmpDir extends Dir {
 }
 
 export function createTerminalDemo(terminalDefinitions, script, config = {}) {
+  const { setup, teardown, ...recordingConfig } = config;
   return {
-    config,
+    config: recordingConfig,
     script,
+    setup,
     terminalDefinitions,
+    teardown,
   };
 }
 

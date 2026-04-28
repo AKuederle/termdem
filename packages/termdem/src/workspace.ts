@@ -100,13 +100,6 @@ export type TerminalWorkspaceDefinition = {
    * operate in the same directory.
    */
   pwd: TerminalWorkspaceProvider;
-  /**
-   * Hidden shell command run before visible demo actions begin.
-   *
-   * Use this for aliases or shell setup that should affect the pane but should not appear
-   * in the visible transcript.
-   */
-  setupCommand?: string;
 };
 
 /**

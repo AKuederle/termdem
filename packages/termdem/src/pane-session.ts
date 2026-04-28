@@ -11,12 +11,12 @@ export type PaneSessionOptions = {
   cols?: number;
   rows?: number;
   prompt?: string;
-  setupCommands?: readonly string[];
   onOutput?: (chunk: string) => void;
 };
 
 export interface PaneSession extends PaneController {
   close(): Promise<void>;
+  execHidden(command: string): Promise<ExecResult>;
   resize(cols: number, rows: number): Promise<void>;
 }
 
@@ -66,7 +66,7 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
   });
 
   const session = new NodePtyPaneSession(pty, prompt, options.onOutput);
-  await session.bootstrap(options.setupCommands ?? []);
+  await session.bootstrap();
   return session;
 }
 
@@ -95,17 +95,11 @@ class NodePtyPaneSession implements PaneSession {
     });
   }
 
-  async bootstrap(setupCommands: readonly string[]) {
+  async bootstrap() {
     await this.waitForPrompt();
     this.pty.write("stty -echo\r");
     this.dataBuffer = "";
     await this.waitForPrompt();
-
-    for (const command of setupCommands) {
-      this.pty.write(`${command}\r`);
-      this.dataBuffer = "";
-      await this.waitForPrompt();
-    }
 
     this.bootstrapping = false;
     this.dataBuffer = "";
@@ -133,6 +127,15 @@ class NodePtyPaneSession implements PaneSession {
       await this.performType(command, { typeDelayMs: options.typeDelayMs });
       this.emitInputVisible("\r\n");
       this.pty.write("\x15");
+      this.pty.write(buildExecShellCommand(command, pending.id));
+      this.pty.write("\r");
+      return pending.result;
+    });
+  }
+
+  async execHidden(command: string) {
+    return this.enqueue(async () => {
+      const pending = await this.beginExec(command, { visible: false });
       this.pty.write(buildExecShellCommand(command, pending.id));
       this.pty.write("\r");
       return pending.result;

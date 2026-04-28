@@ -19,9 +19,13 @@ export {
   createTerminalDemo,
   type TerminalDefinition,
   type TerminalDemo,
+  type TerminalDemoOptions,
   type TerminalPaneComponent,
   type TerminalPaneComponents,
   type TerminalPaneProps,
+  type TerminalDemoScript,
   type TerminalDemoScriptApi,
+  type TerminalDemoSetup,
+  type TerminalDemoTeardown,
 } from "./terminal-demo.ts";
 export type { ExecOptions, ExecResult, PaneController, PressKey, TypeOptions } from "./types.ts";

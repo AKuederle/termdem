@@ -64,10 +64,12 @@ export type TerminalPaneComponent = (props: TerminalPaneProps) => ReactElement;
  * }
  * ```
  */
-export type TerminalPaneComponents<TDemo extends TerminalDemo<readonly TerminalDefinition[]>> =
-  TDemo extends TerminalDemo<infer TTerminals>
+export type TerminalPaneComponents<TDemo> =
+  TDemo extends TerminalDemo<infer TTerminals, string, any>
     ? Record<TTerminals[number]["name"], TerminalPaneComponent>
     : never;
+
+type Awaitable<T> = T | Promise<T>;
 
 /**
  * API passed to the script function provided to `createTerminalDemo()`.
@@ -192,17 +194,52 @@ export type TerminalDemoScriptApi<Name extends string> = {
   waitFor(label: string, probe: () => Promise<boolean>, options?: WaitForOptions): Promise<void>;
 };
 
+export type TerminalDemoSetup<Name extends string, SetupData = unknown> = (
+  api: TerminalDemoScriptApi<Name>,
+) => Awaitable<SetupData>;
+
+export type TerminalDemoScript<Name extends string, SetupData = undefined> = (
+  api: TerminalDemoScriptApi<Name>,
+  setupData: SetupData,
+) => Awaitable<void>;
+
+export type TerminalDemoTeardown<Name extends string, SetupData = undefined> = (
+  api: TerminalDemoScriptApi<Name>,
+  setupData: SetupData,
+) => Awaitable<void>;
+
+export type TerminalDemoOptions<Name extends string, SetupData = undefined> = RecordingConfig & {
+  /**
+   * Hidden setup callback run before the visible demo script.
+   *
+   * It receives the same API as the script, but pane commands run without frontend output
+   * and default to instant execution. Its return value is passed to the script.
+   */
+  setup?: TerminalDemoSetup<Name, SetupData>;
+  /**
+   * Hidden teardown callback run after the visible demo script.
+   *
+   * It receives the same hidden API as setup and the setup return value.
+   */
+  teardown?: TerminalDemoTeardown<Name, SetupData>;
+};
+
 /**
  * Complete demo object exported from a demo file as `demo`.
  */
 export type TerminalDemo<
   TTerminals extends readonly TerminalDefinition[],
   TName extends TTerminals[number]["name"] = TTerminals[number]["name"],
+  TSetupData = undefined,
 > = {
   /** Recording and preview configuration for this demo. */
   config: RecordingConfig;
   /** Script that drives visible panes and hidden Node-side work. */
-  script: (api: TerminalDemoScriptApi<TName>) => Promise<void> | void;
+  script: TerminalDemoScript<TName, TSetupData>;
+  /** Hidden setup hook run before the visible script. */
+  setup?: TerminalDemoSetup<TName, TSetupData>;
+  /** Hidden teardown hook run after the visible script. */
+  teardown?: TerminalDemoTeardown<TName, TSetupData>;
   /** Terminal panes available to the script and render function. */
   terminalDefinitions: TTerminals;
 };
@@ -256,14 +293,21 @@ export type TerminalDemo<
  * }
  * ```
  */
-export function createTerminalDemo<const TTerminals extends readonly TerminalDefinition[]>(
+export function createTerminalDemo<
+  const TTerminals extends readonly TerminalDefinition[],
+  const TSetupData = undefined,
+>(
   terminalDefinitions: TTerminals,
-  script: (api: TerminalDemoScriptApi<TTerminals[number]["name"]>) => Promise<void> | void,
-  config: RecordingConfig = {},
-): TerminalDemo<TTerminals> {
+  script: TerminalDemoScript<TTerminals[number]["name"], TSetupData>,
+  options: TerminalDemoOptions<TTerminals[number]["name"], TSetupData> = {},
+): TerminalDemo<TTerminals, TTerminals[number]["name"], TSetupData> {
+  const { setup, teardown, ...config } = options;
+
   return {
     config,
     script,
+    setup,
     terminalDefinitions,
+    teardown,
   };
 }

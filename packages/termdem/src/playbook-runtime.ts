@@ -1,7 +1,12 @@
 import { execFile } from "node:child_process";
 import { createPaneSession, type PaneSession } from "./pane-session.ts";
 import { waitForPlaybookDelay } from "./playbook-wait.ts";
-import type { TerminalDemoScriptApi } from "./terminal-demo.ts";
+import type {
+  TerminalDemoScript,
+  TerminalDemoScriptApi,
+  TerminalDemoSetup,
+  TerminalDemoTeardown,
+} from "./terminal-demo.ts";
 import { typingDelays } from "./typing-delays.ts";
 import type {
   ExecOptions,
@@ -54,6 +59,11 @@ type ManagedPane = {
   workspace: TerminalWorkspace;
 };
 
+export type PlaybookLifecycle<Name extends string, SetupData = undefined> = {
+  setup?: TerminalDemoSetup<Name, SetupData>;
+  teardown?: TerminalDemoTeardown<Name, SetupData>;
+};
+
 export class PlaybookRuntime<Name extends string = string> {
   private readonly options: PlaybookRuntimeOptions;
   private readonly panes = new Map<string, ManagedPane>();
@@ -82,7 +92,6 @@ export class PlaybookRuntime<Name extends string = string> {
         },
         prompt,
         rows: 8,
-        setupCommands: terminal.setupCommand ? [terminal.setupCommand] : [],
         shell,
       });
 
@@ -94,12 +103,20 @@ export class PlaybookRuntime<Name extends string = string> {
     this.options.onRecordingState?.({ state: "ready" });
   }
 
-  async run(script: (api: TerminalDemoScriptApi<Name>) => Promise<void> | void) {
+  async run(script: TerminalDemoScript<Name, undefined>): Promise<void>;
+  async run<SetupData>(
+    script: TerminalDemoScript<Name, SetupData>,
+    lifecycle: PlaybookLifecycle<Name, SetupData>,
+  ): Promise<void>;
+  async run<SetupData = undefined>(
+    script: TerminalDemoScript<Name, SetupData>,
+    lifecycle: PlaybookLifecycle<Name, SetupData> = {},
+  ) {
     if (this.activeRun) {
       return this.activeRun;
     }
 
-    const run = this.runScript(script);
+    const run = this.runScript(script, lifecycle);
     this.activeRun = run;
     void run.finally(() => {
       if (this.activeRun === run) {
@@ -115,11 +132,19 @@ export class PlaybookRuntime<Name extends string = string> {
     this.publishPlaybookState({ state: "stopped" });
   }
 
-  async restart(script: (api: TerminalDemoScriptApi<Name>) => Promise<void> | void) {
+  async restart(script: TerminalDemoScript<Name, undefined>): Promise<void>;
+  async restart<SetupData>(
+    script: TerminalDemoScript<Name, SetupData>,
+    lifecycle: PlaybookLifecycle<Name, SetupData>,
+  ): Promise<void>;
+  async restart<SetupData = undefined>(
+    script: TerminalDemoScript<Name, SetupData>,
+    lifecycle: PlaybookLifecycle<Name, SetupData> = {},
+  ) {
     this.stop();
     await this.closePanes();
     this.closed = false;
-    await this.run(script);
+    await this.run(script, lifecycle);
   }
 
   async resizePane(pane: string, cols: number, rows: number) {
@@ -167,12 +192,19 @@ export class PlaybookRuntime<Name extends string = string> {
     await this.closePanes();
   }
 
-  private createApi(generation: number): TerminalDemoScriptApi<Name> {
+  private createApi(
+    generation: number,
+    options: {
+      defaultTypeDelayMs?: number;
+      hiddenPaneExec?: boolean;
+      publishActions?: boolean;
+    } = {},
+  ): TerminalDemoScriptApi<Name> {
     return {
       node: {
         execFile: (file, args = [], options = {}) => execFileForPlaybook(file, args, options),
       },
-      pane: (name) => this.createPaneController(String(name), generation),
+      pane: (name) => this.createPaneController(String(name), generation, options),
       wait: async (delayMs) => {
         await this.ensureActive(generation);
         await waitForPlaybookDelay(delayMs, () => this.ensureActive(generation));
@@ -181,52 +213,106 @@ export class PlaybookRuntime<Name extends string = string> {
     };
   }
 
-  private async runScript(script: (api: TerminalDemoScriptApi<Name>) => Promise<void> | void) {
+  private async runScript<SetupData = undefined>(
+    script: TerminalDemoScript<Name, SetupData>,
+    lifecycle: PlaybookLifecycle<Name, SetupData>,
+  ) {
     const generation = ++this.generation;
     await this.ensureReady();
     this.publishPlaybookState({ state: "running" });
     this.options.onRecordingState?.({ state: "started" });
+    let setupComplete = false;
+    let setupData: SetupData | undefined;
+    let runError: unknown;
 
     try {
-      await script(this.createApi(generation));
-      if (this.isCurrent(generation)) {
-        this.publishPlaybookState({ state: "done" });
-        this.options.onRecordingState?.({ state: "done" });
-      }
+      const setupApi = this.createApi(generation, {
+        defaultTypeDelayMs: 0,
+        hiddenPaneExec: true,
+        publishActions: false,
+      });
+      setupData = (await lifecycle.setup?.(setupApi)) as SetupData | undefined;
+      setupComplete = true;
+      await script(this.createApi(generation), setupData as SetupData);
     } catch (error) {
-      if (!this.isCurrent(generation) && formatError(error) === "Playbook stopped") {
+      runError = error;
+    }
+
+    if (setupComplete && lifecycle.teardown) {
+      try {
+        const teardownGeneration = this.closed ? generation : this.generation;
+        const teardownApi = this.createApi(teardownGeneration, {
+          defaultTypeDelayMs: 0,
+          hiddenPaneExec: true,
+          publishActions: false,
+        });
+        await lifecycle.teardown(teardownApi, setupData as SetupData);
+      } catch (error) {
+        runError ??= error;
+      }
+    }
+
+    if (runError) {
+      if (!this.isCurrent(generation) && formatError(runError) === "Playbook stopped") {
         return;
       }
 
       if (this.isCurrent(generation)) {
-        const message = formatError(error);
+        const message = formatError(runError);
         this.publishPlaybookState({ state: "error", error: message });
         this.options.onRecordingState?.({ state: "error", error: message });
       }
+      return;
+    }
+
+    if (this.isCurrent(generation)) {
+      this.publishPlaybookState({ state: "done" });
+      this.options.onRecordingState?.({ state: "done" });
     }
   }
 
-  private createPaneController(name: string, generation: number): PaneController {
-    const withDefaultTypeDelay = (options?: TypeOptions) => ({
-      ...options,
-      typeDelayMs: options?.typeDelayMs ?? this.options.typeDelayMs ?? typingDelays.WPM_60,
+  private createPaneController(
+    name: string,
+    generation: number,
+    controllerOptions: {
+      defaultTypeDelayMs?: number;
+      hiddenPaneExec?: boolean;
+      publishActions?: boolean;
+    } = {},
+  ): PaneController {
+    const actionName = (method: string) =>
+      controllerOptions.publishActions === false
+        ? undefined
+        : `pane(${JSON.stringify(name)}).${method}`;
+    const defaultTypeDelayMs =
+      controllerOptions.defaultTypeDelayMs ?? this.options.typeDelayMs ?? typingDelays.WPM_60;
+    const withDefaultTypeDelay = (inputOptions?: TypeOptions) => ({
+      ...inputOptions,
+      typeDelayMs:
+        inputOptions?.typeDelayMs ??
+        controllerOptions.defaultTypeDelayMs ??
+        this.options.typeDelayMs ??
+        defaultTypeDelayMs,
     });
 
     return {
       exec: async (command: string, options?: ExecOptions): Promise<ExecResult> => {
-        await this.ensureActive(generation, `pane(${JSON.stringify(name)}).exec`);
+        await this.ensureActive(generation, actionName("exec"));
+        if (controllerOptions.hiddenPaneExec) {
+          return this.readyPane(name).execHidden(command);
+        }
         return this.readyPane(name).exec(command, withDefaultTypeDelay(options));
       },
       press: async (key: PressKey): Promise<void> => {
-        await this.ensureActive(generation, `pane(${JSON.stringify(name)}).press`);
+        await this.ensureActive(generation, actionName("press"));
         await this.readyPane(name).press(key);
       },
       sendLine: async (command: string, options?: TypeOptions): Promise<void> => {
-        await this.ensureActive(generation, `pane(${JSON.stringify(name)}).sendLine`);
+        await this.ensureActive(generation, actionName("sendLine"));
         await this.readyPane(name).sendLine(command, withDefaultTypeDelay(options));
       },
       type: async (text: string, options?: TypeOptions): Promise<void> => {
-        await this.ensureActive(generation, `pane(${JSON.stringify(name)}).type`);
+        await this.ensureActive(generation, actionName("type"));
         await this.readyPane(name).type(text, withDefaultTypeDelay(options));
       },
     };

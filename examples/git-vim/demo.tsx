@@ -17,9 +17,6 @@ export const demo = createTerminalDemo(
     {
       name: "git",
       pwd: repo,
-      // Keep the recording focused on `vim README.md`, while making Vim deterministic:
-      // ignore user config/history, skip swap files, and make Esc resolve quickly.
-      setupCommand: `alias vim='vim -Nu NONE -n -i NONE --cmd "set ttimeout ttimeoutlen=10"'`,
     },
   ],
   async (api) => {
@@ -51,6 +48,13 @@ export const demo = createTerminalDemo(
     await git.exec("git log --oneline --decorate --stat -1");
   },
   {
+    setup: async (api) => {
+      // Keep the recording focused on `vim README.md`, while making Vim deterministic:
+      // ignore user config/history, skip swap files, and make Esc resolve quickly.
+      await api
+        .pane("git")
+        .exec(`alias vim='vim -Nu NONE -n -i NONE --cmd "set ttimeout ttimeoutlen=10"'`);
+    },
     size: { width: 1280, height: 720 },
     typeDelayMs: typingDelays.WPM_120,
   },

@@ -86,6 +86,49 @@ test("playbook runtime retries waitFor probes and reports timeout labels", async
   ).rejects.toThrow('Timed out waiting for "never ready"');
 });
 
+test("playbook runtime runs hidden lifecycle hooks around the visible script", async () => {
+  const states: string[] = [];
+  const visibleOutput: string[] = [];
+  const teardownData: string[] = [];
+  const runtime = new PlaybookRuntime({
+    onPaneOutput(message) {
+      visibleOutput.push(message.data);
+    },
+    onPlaybookState(state) {
+      states.push(state.state);
+    },
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
+    typeDelayMs: 50,
+  });
+
+  await runtime.run(
+    async (api, setupData: { message: string }) => {
+      expect(setupData).toEqual({ message: "hidden setup output" });
+      const result = await api.pane("main").exec("printf visible-script", { typeDelayMs: 0 });
+      expect(result.text).toBe("visible-script");
+    },
+    {
+      setup: async (api) => {
+        const result = await api.pane("main").exec("printf 'hidden setup output'");
+        return { message: result.text };
+      },
+      teardown: async (api, setupData) => {
+        expect(states).not.toContain("done");
+        teardownData.push(setupData.message);
+        await api.pane("main").exec("printf hidden-teardown");
+      },
+    },
+  );
+
+  const transcript = visibleOutput.join("");
+  expect(transcript).toContain("printf visible-script");
+  expect(transcript).toContain("visible-script");
+  expect(transcript).not.toContain("hidden setup output");
+  expect(transcript).not.toContain("hidden-teardown");
+  expect(states).toContain("done");
+  expect(teardownData).toEqual(["hidden setup output"]);
+});
+
 test("playbook runtime cancellation prevents stale playbook completion", async () => {
   const states: string[] = [];
   const runtime = new PlaybookRuntime({

@@ -5,6 +5,8 @@ import { clientShimSource, previewEntrySource } from "../src/preview-server.ts";
 test("createTerminalDemo preserves backend terminal definitions and config", () => {
   const dir = new TmpDir({});
   const script = () => {};
+  const setup = () => ({ ready: true });
+  const teardown = () => {};
 
   const demo = createTerminalDemo(
     [
@@ -19,7 +21,9 @@ test("createTerminalDemo preserves backend terminal definitions and config", () 
     ],
     script,
     {
+      setup,
       size: { width: 1920, height: 1080 },
+      teardown,
       typeDelayMs: 100,
       viewportSize: { width: 1440, height: 900 },
     },
@@ -27,6 +31,8 @@ test("createTerminalDemo preserves backend terminal definitions and config", () 
 
   expect(demo.terminalDefinitions.map((terminal) => terminal.name)).toEqual(["server", "client"]);
   expect(demo.script).toBe(script);
+  expect(demo.setup).toBe(setup);
+  expect(demo.teardown).toBe(teardown);
   expect(demo.config).toEqual({
     size: { width: 1920, height: 1080 },
     typeDelayMs: 100,
@@ -41,22 +47,25 @@ test("createTerminalDemo scripts can wait without selecting a pane", async () =>
     calls.push("after wait");
   });
 
-  await demo.script({
-    node: {
-      async execFile() {
-        throw new Error("node.execFile should not be required for wait");
+  await demo.script(
+    {
+      node: {
+        async execFile() {
+          throw new Error("node.execFile should not be required for wait");
+        },
+      },
+      pane() {
+        throw new Error("pane should not be required for wait");
+      },
+      async wait(delayMs) {
+        calls.push(`wait:${delayMs}`);
+      },
+      async waitFor() {
+        throw new Error("waitFor should not be required for wait");
       },
     },
-    pane() {
-      throw new Error("pane should not be required for wait");
-    },
-    async wait(delayMs) {
-      calls.push(`wait:${delayMs}`);
-    },
-    async waitFor() {
-      throw new Error("waitFor should not be required for wait");
-    },
-  });
+    undefined,
+  );
 
   expect(calls).toEqual(["wait:125", "after wait"]);
 });
