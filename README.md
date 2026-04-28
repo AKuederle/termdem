@@ -34,10 +34,8 @@ A minimal scene with two panes looks like this.
 
 ```ts
 import {
-  Dir,
+  TmpDir,
   createTerminalDemo,
-  quoteShellArg,
-  typingDelays,
   type TerminalPaneComponents,
 } from "@akuederle/termdem";
 
