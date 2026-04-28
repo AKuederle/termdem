@@ -163,12 +163,17 @@ await api.pane("client").exec(`node client.mjs ${quoteShellArg(url)}`);
 Use normal JavaScript inside `script`, `setup`, and `teardown` for values that do not need a shell, and use `api.node.execFile()` for hidden subprocesses.
 `api.node.execFile()` can run any executable available to the preview server, but it receives an executable plus an argument array rather than a shell command string.
 Use `sh -c` explicitly if you need shell syntax such as pipes, redirects, or environment-variable expansion.
+Use `pane.cwd()` when the hidden process should run in the same current working directory as a pane.
 This pairs well with `api.waitFor()` when a visible pane starts a server and the script needs to wait until it is ready.
 
 ```ts
-await api.pane("server").sendLine("npm run dev");
+const server = api.pane("server");
+await server.sendLine("npm run dev");
+
 await api.waitFor("server ready", async () => {
+  const cwd = await server.cwd();
   const result = await api.node.execFile("curl", ["-fsS", "http://127.0.0.1:5173"], {
+    cwd,
     reject: false,
     timeoutMs: 1000,
   });
