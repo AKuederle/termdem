@@ -41,6 +41,7 @@ type CompletedExecState = {
 };
 
 const defaultPrompt = "TERMDEM> ";
+const promptMarker = "\u001eTD_PROMPT\u001e";
 
 export async function createPaneSession(options: PaneSessionOptions = {}): Promise<PaneSession> {
   const prompt = options.prompt ?? defaultPrompt;
@@ -68,7 +69,7 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
       MANPAGER: "cat",
       PAGER: "cat",
       TERM: "xterm-256color",
-      PS1: prompt,
+      PS1: `${prompt}${promptMarker}`,
       PROMPT_COMMAND: "",
     },
   });
@@ -317,10 +318,6 @@ class NodePtyPaneSession implements PaneSession {
       this.pendingExec?.rawChunks.push(text);
     }
 
-    if (suppressHiddenPromptOutput) {
-      this.hiddenOutputUntilPrompt -= promptEndsText(visibleText, this.prompt) ? 1 : 0;
-    }
-
     if (this.completedExec && visibleText.includes(this.prompt)) {
       const completedExec = this.completedExec;
       clearTimeout(completedExec.timer);
@@ -330,6 +327,13 @@ class NodePtyPaneSession implements PaneSession {
   }
 
   private handleMarker(marker: string) {
+    if (marker === "TD_PROMPT") {
+      if (this.hiddenOutputUntilPrompt > 0) {
+        this.hiddenOutputUntilPrompt -= 1;
+      }
+      return;
+    }
+
     if (marker.startsWith("TD_BEGIN:")) {
       this.captureActive = true;
       return;
@@ -463,10 +467,6 @@ function countPromptProducingControls(text: string) {
   }
 
   return count;
-}
-
-function promptEndsText(text: string, prompt: string) {
-  return text.endsWith(prompt);
 }
 
 async function sleep(delayMs: number) {

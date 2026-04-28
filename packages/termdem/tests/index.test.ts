@@ -109,6 +109,36 @@ test("pane sessions reject empty prompts", async () => {
   );
 });
 
+test("pane sessions hide prompt-like output from hidden input without hiding visible work", async () => {
+  const visibleOutput: string[] = [];
+  const session = await createPaneSession({
+    onOutput(chunk) {
+      visibleOutput.push(chunk);
+    },
+    prompt: "PROMPT> ",
+  });
+
+  try {
+    await session.typeHidden("printf 'fake PROMPT> '\rprintf hidden-second\r", {
+      typeDelayMs: 0,
+    });
+
+    const result = await session.exec("printf visible-after-hidden", {
+      typeDelayMs: 0,
+    });
+
+    expect(result.text).toBe("visible-after-hidden");
+
+    const transcript = visibleOutput.join("");
+    expect(transcript).toContain("visible-after-hidden");
+    expect(transcript).not.toContain("fake PROMPT");
+    expect(transcript).not.toContain("hidden-second");
+    expect(transcript).not.toContain("TD_PROMPT");
+  } finally {
+    await session.close();
+  }
+});
+
 test("pane sessions can chain exec results from ls into cat", async () => {
   const cwd = await createTempDir();
   await writeFile(join(cwd, "alpha.txt"), "alpha file\n", "utf8");
