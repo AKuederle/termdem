@@ -66,6 +66,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   const initialPreviewMode = useInitialValue(() => readInitialPreviewMode());
   const paneRuntimesRef = useRef(new Map<string, PaneRuntime>());
   const paneMountCountsRef = useRef(new Map<string, number>());
+  const paneMountErrorRef = useRef<string | null>(null);
   const playbookRunIdRef = useRef(0);
   const previewModeRef = useRef<PreviewMode>(initialPreviewMode);
   const resumeWaitersRef = useRef<Array<() => void>>([]);
@@ -228,11 +229,15 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       const nextError = paneMountErrorFromCounts(paneNames, paneMountCountsRef.current);
+      const previousError = paneMountErrorRef.current;
+      paneMountErrorRef.current = nextError;
       setPaneMountError(nextError);
 
       if (nextError) {
         markRecordingReady(false);
         markRecordingError(nextError);
+      } else if (previousError && globalThis.__termdem?.recording?.error === previousError) {
+        markRecordingError(undefined);
       }
     }, 0);
 
@@ -772,7 +777,7 @@ function markRecordingDone(done: boolean) {
   };
 }
 
-function markRecordingError(error: string) {
+function markRecordingError(error: string | undefined) {
   globalThis.__termdem = {
     ...globalThis.__termdem,
     recording: {
