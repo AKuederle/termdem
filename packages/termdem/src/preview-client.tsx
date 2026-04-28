@@ -1,21 +1,21 @@
-import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { Terminal, useTerminal } from "@wterm/react";
 import "@wterm/react/css";
 import { waitForPlaybookDelay } from "./playbook-wait.ts";
 import { parsePaneServerMessage, type PaneClientMessage } from "./protocol.ts";
-import { collectPaneDefinitions, renderStageScene, type PaneDefinition } from "./scene.ts";
+import type { TerminalPaneComponent, TerminalPaneProps } from "./terminal-demo.ts";
 import type { ExecResult, PaneController, PressKey, TypeOptions } from "./types.ts";
 
 type PreviewMode = "running" | "stopped";
 
 type PreviewDemoModule = {
-  render: (terminals: Record<string, { name: string }>) => ReactNode;
+  render: (panes: Record<string, TerminalPaneComponent>) => ReactNode;
   script?: (api: {
     pane(name: string): PaneController;
     wait(delayMs: number): Promise<void>;
   }) => Promise<void> | void;
-  terminals: Record<string, { name: string }>;
+  terminalDefinitions: readonly { name: string }[];
 };
 
 type PaneRuntime = PaneController & {
@@ -60,8 +60,9 @@ export function renderPreviewApp(demo: PreviewDemoModule) {
 }
 
 function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
-  const scene = useInitialValue(() => createDemoScene(demo));
-  const paneNames = useInitialValue(() => collectPaneDefinitions(scene).map((pane) => pane.name));
+  const paneNames = useInitialValue(() =>
+    paneNamesFromTerminalDefinitions(demo.terminalDefinitions),
+  );
   const initialPreviewMode = useInitialValue(() => readInitialPreviewMode());
   const paneRuntimesRef = useRef(new Map<string, PaneRuntime>());
   const playbookRunIdRef = useRef(0);
@@ -100,6 +101,11 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
     paneRuntimesRef.current.set(name, runtime);
     setRuntimeVersion((version) => version + 1);
   });
+
+  const paneComponents = useMemo(
+    () => createPaneComponents(paneNames, sessionKey, onRuntimeChange),
+    [onRuntimeChange, paneNames, sessionKey],
+  );
 
   const resumePlaybook = useEffectEvent(() => {
     previewModeRef.current = "running";
@@ -220,13 +226,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
 
   return (
     <>
-      {renderStageScene(scene, (pane) => (
-        <PaneTerminalCard
-          key={`${sessionKey}:${pane.name}`}
-          onRuntimeChange={onRuntimeChange}
-          pane={pane}
-        />
-      ))}
+      {demo.render(paneComponents)}
       {overlayVisible ? (
         <PreviewOverlay
           mode={previewMode}
@@ -248,19 +248,38 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   );
 }
 
+function paneNamesFromTerminalDefinitions(terminalDefinitions: readonly { name: string }[]) {
+  const paneNames: string[] = [];
+  const seenNames = new Set<string>();
+
+  for (const terminal of terminalDefinitions) {
+    if (seenNames.has(terminal.name)) {
+      throw new Error(`Duplicate terminal name "${terminal.name}"`);
+    }
+
+    seenNames.add(terminal.name);
+    paneNames.push(terminal.name);
+  }
+
+  return paneNames;
+}
+
 function PaneTerminalCard({
+  className,
+  name,
   onRuntimeChange,
-  pane,
+  style,
 }: {
+  className?: string;
+  name: string;
   onRuntimeChange: (name: string, runtime: PaneRuntime) => void;
-  pane: PaneDefinition;
+  style?: TerminalPaneProps["style"];
 }) {
-  const { connectionKey, exec, press, ref, requestResize, status, type, write } = usePaneConnection(
-    pane.name,
-  );
+  const { connectionKey, exec, press, ref, requestResize, status, type, write } =
+    usePaneConnection(name);
 
   useEffect(() => {
-    onRuntimeChange(pane.name, {
+    onRuntimeChange(name, {
       connectionKey,
       exec,
       press,
@@ -268,12 +287,12 @@ function PaneTerminalCard({
       type,
       write,
     });
-  }, [connectionKey, pane.name, status]);
+  }, [connectionKey, name, status]);
 
   return (
-    <article className={`${paneFrameClassName} ${pane.className ?? ""}`} style={pane.style}>
+    <article className={`${paneFrameClassName} ${className ?? ""}`} style={style}>
       <header className="flex h-6 shrink-0 items-center border-b border-[#2f2f2f] bg-[#1b1b1b] px-2 font-mono text-[11px] font-semibold leading-none text-cyan-300">
-        {pane.name}
+        {name}
       </header>
 
       <Terminal
@@ -292,6 +311,33 @@ function PaneTerminalCard({
       />
     </article>
   );
+}
+
+function createPaneComponents(
+  paneNames: string[],
+  sessionKey: number,
+  onRuntimeChange: (name: string, runtime: PaneRuntime) => void,
+) {
+  const panes = Object.fromEntries(
+    paneNames.map((name) => {
+      function TermdemPane({ className, style }: TerminalPaneProps) {
+        return (
+          <PaneTerminalCard
+            key={`${sessionKey}:${name}`}
+            className={className}
+            name={name}
+            onRuntimeChange={onRuntimeChange}
+            style={style}
+          />
+        );
+      }
+
+      TermdemPane.displayName = `TermdemPane(${name})`;
+      return [name, TermdemPane];
+    }),
+  );
+
+  return panes as Record<string, TerminalPaneComponent>;
 }
 
 function usePaneConnection(paneName: string) {
@@ -542,10 +588,6 @@ async function runPaneAction<T>(label: string, action: () => Promise<T>) {
   } finally {
     markRecordingAction(undefined);
   }
-}
-
-function createDemoScene(demo: PreviewDemoModule) {
-  return demo.render(demo.terminals);
 }
 
 function socketUrlForPane(paneName: string) {

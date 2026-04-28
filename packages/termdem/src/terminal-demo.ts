@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactElement } from "react";
 import { type RecordingConfig } from "./recording-config.ts";
 import { type PaneController } from "./types.ts";
 import { type TerminalWorkspaceDefinition } from "./workspace.ts";
@@ -11,6 +12,18 @@ export type TerminalHandle<Name extends string = string> = {
 export type TerminalHandles<TDemo extends TerminalDemo<readonly TerminalDefinition[]>> =
   TDemo extends TerminalDemo<infer TTerminals>
     ? Record<TTerminals[number]["name"], TerminalHandle<TTerminals[number]["name"]>>
+    : never;
+
+export type TerminalPaneProps = {
+  className?: string;
+  style?: CSSProperties;
+};
+
+export type TerminalPaneComponent = (props: TerminalPaneProps) => ReactElement;
+
+export type TerminalPaneComponents<TDemo extends TerminalDemo<readonly TerminalDefinition[]>> =
+  TDemo extends TerminalDemo<infer TTerminals>
+    ? Record<TTerminals[number]["name"], TerminalPaneComponent>
     : never;
 
 export type TerminalDemoScriptApi<Name extends string> = {

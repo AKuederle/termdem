@@ -562,11 +562,7 @@ function previewEntrySource(demoPath: string) {
 import demo, { render } from ${JSON.stringify(`/@fs/${toVitePath(demoPath)}`)};
 import { renderPreviewApp } from "@akuederle/termdem/preview-client";
 
-const terminals = Object.fromEntries(
-  demo.terminalDefinitions.map((terminal) => [terminal.name, { name: terminal.name }]),
-);
-
-renderPreviewApp({ render, script: demo.script, terminals });
+renderPreviewApp({ render, script: demo.script, terminalDefinitions: demo.terminalDefinitions });
 `;
 }
 

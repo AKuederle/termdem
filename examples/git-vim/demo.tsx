@@ -1,11 +1,4 @@
-import {
-  Pane,
-  Stage,
-  TmpDir,
-  createTerminalDemo,
-  keys,
-  type TerminalHandles,
-} from "@akuederle/termdem";
+import { TmpDir, createTerminalDemo, keys, type TerminalPaneComponents } from "@akuederle/termdem";
 
 const VIM = "vim -Nu NONE -n -i NONE";
 
@@ -61,12 +54,12 @@ const demo = createTerminalDemo(
 
 export default demo;
 
-export function render(terminals: TerminalHandles<typeof demo>) {
+export function render(panes: TerminalPaneComponents<typeof demo>) {
+  const GitPane = panes.git;
+
   return (
-    <Stage>
-      <main className="grid h-dvh bg-[#111] p-1">
-        <Pane terminal={terminals.git} className="min-h-0 min-w-0" />
-      </main>
-    </Stage>
+    <main className="grid h-dvh bg-[#111] p-1">
+      <GitPane className="min-h-0 min-w-0" />
+    </main>
   );
 }

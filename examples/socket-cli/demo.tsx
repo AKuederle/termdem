@@ -1,11 +1,9 @@
 import {
   Dir,
-  Pane,
-  Stage,
   createTerminalDemo,
   execNode,
   quoteShellArg,
-  type TerminalHandles,
+  type TerminalPaneComponents,
 } from "@akuederle/termdem";
 
 const workspace = new Dir(() => decodeURIComponent(new URL(".", import.meta.url).pathname));
@@ -59,18 +57,17 @@ const demo = createTerminalDemo(
 
 export default demo;
 
-export function render(terminals: TerminalHandles<typeof demo>) {
+export function render(panes: TerminalPaneComponents<typeof demo>) {
+  const ServerPane = panes.server;
+  const SenderPane = panes.sender;
+  const ListenerPane = panes.listener;
+
   return (
-    <Stage>
-      <main className="grid h-dvh min-h-0 grid-cols-1 grid-rows-3 gap-px bg-[#333] p-px lg:grid-cols-[1fr_1.1fr] lg:grid-rows-2">
-        <Pane terminal={terminals.server} className="min-h-0 min-w-0" />
-        <Pane terminal={terminals.sender} className="min-h-0 min-w-0 lg:row-start-2" />
-        <Pane
-          terminal={terminals.listener}
-          className="min-h-0 min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1"
-        />
-      </main>
-    </Stage>
+    <main className="grid h-dvh min-h-0 grid-cols-1 grid-rows-3 gap-px bg-[#333] p-px lg:grid-cols-[1fr_1.1fr] lg:grid-rows-2">
+      <ServerPane className="min-h-0 min-w-0" />
+      <SenderPane className="min-h-0 min-w-0 lg:row-start-2" />
+      <ListenerPane className="min-h-0 min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1" />
+    </main>
   );
 }
 
