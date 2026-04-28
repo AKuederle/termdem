@@ -1,23 +1,32 @@
 # Termdem
 
-Create complex terminal demos videos using JS/TS
+Create complex terminal demo videos using JS/TS.
 
 ## Features
 
-- Multiple terminal panes with custom styling
-- Simulated typing
-- Hidden setup/background commands
-- Access to outputs of each terminal command for complex orchestration
+- Script multiple terminal panes in one recording.
+- Style each pane with regular React and Tailwind.
+- Simulate realistic typing, special keys, and interactive terminal apps.
+- Run hidden setup, teardown, and background checks.
+- Capture command output and use it to drive later steps.
 
 ## Install
 
-Mac and Linux only at the moment!
+> [!WARNING]
+> Termdem is currently supported on macOS and Linux only.
 
 ```
 npm install @akuederle/termdem
 ```
 
-<!-- TODO: Add palywright setup + ffmped -->
+Install the Playwright browser binaries before recording demos.
+
+```
+npx playwright install chromium
+```
+
+WebM recording works out of the box after the Chromium install.
+Install [ffmpeg](https://ffmpeg.org/) if you want to record to non-WebM formats such as MP4.
 
 ## Usage
 
@@ -35,7 +44,7 @@ Create one `.tsx` file per demo, export the `demo` returned by `createTerminalDe
 
 Panes define the terminals that the script can control and the render function can display.
 The render function receives one React component per pane, keyed by pane name.
-Tailwind v4 is available in demo files, so regular utility classes are enough for most layouts.
+[Tailwind v4](https://tailwindcss.com/) is available in demo files, so regular utility classes are enough for most layouts.
 
 ```tsx
 import { TmpDir, createTerminalDemo, type TerminalPaneComponents } from "@akuederle/termdem";
@@ -230,28 +239,28 @@ await api.waitFor("server ready", async () => {
 
 ## How it works
 
-A demo file defines a script (the steps to be performed) and the visual layout as react components.
-We use vite to split this file into a server (the execution engine) and a client bundle (rendering).
+A demo file defines a script, which is the sequence of steps to run, and a visual layout made from React components.
+Termdem uses [Vite](https://vite.dev/) to split that file into a server-side execution engine and a client-side rendering bundle.
 
-The frontend uses [wterm]() to render a posix compliant terminal in the browser.
-Each rendered terminal connects to backend PTY via websocket.
+The frontend uses [wterm](https://wterm.dev/react) to render a POSIX-compatible terminal in the browser.
+Each rendered terminal connects to a backend PTY over WebSocket.
 
-The execution engine then runs commands in the PTY and echos the terminal codes and text to the terminal rendered in the browser.
+The execution engine runs commands in the PTY and echoes terminal codes and text to the terminal rendered in the browser.
 
-For recording, we use a headless Chromium instance orchestrated via [playwright]() and use the browser built-in record functionality to generate the video.
-Finally, we use _ffmpeg_ to convert the video to its final format.
+For recording, Termdem uses a headless Chromium instance orchestrated by [Playwright](https://playwright.dev/) and the browser's built-in recording functionality to generate the video.
+Finally, Termdem uses [ffmpeg](https://ffmpeg.org/) to convert the video to its final format when needed.
 
 ## Why this exists
 
-I needed to record a terminal based demo that showed two process communicating with each other using a websocket.
-To make this a reliable demo, I could easily re-record once I update the code, I thought it might be nice to script it.
+I needed to record a terminal based demo that showed two processes communicating with each other over a WebSocket.
+To make the demo reliable and easy to re-record whenever the code changed, I wanted to script it.
 
-Based on this I found [vhs](), which has a very nice API to script and record terminal sessions.
+Based on this, I found [VHS](https://github.com/charmbracelet/vhs), which has a very nice API to script and record terminal sessions.
 To make it possible to show multiple processes (aka multiple terminals), I used tmux to multiplex the terminal session that was recorded.
 
-This worked great, but _vhs_ is missing one critical feature: Parsing the typed outputs from within the script.
+This worked great, but _VHS_ is missing one critical feature: parsing the typed outputs from within the script.
 
-The demo I was preparing demonstrated a secret based connection establishment and secret from one process needs to be sent to the second process via a "side channel" (aka copy and past, if I would record the demo manually).
-Unfortunately, in vhs it is impossible to get the output of previous commands to interactively change the subsequent commands.
+The demo I was preparing demonstrated a secret based connection establishment, and a secret from one process needed to be sent to the second process through a "side channel" (aka copy and paste, if I recorded the demo manually).
+Unfortunately, in VHS it is impossible to get the output of previous commands and use it to interactively change subsequent commands.
 
-So simply speaking, I wanted a way to record terminal demos optimized for multiple panes and with the ability to intersect and parse the output of each command.
+So simply speaking, I wanted a way to record terminal demos optimized for multiple panes, with the ability to inspect and parse the output of each command.
