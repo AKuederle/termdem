@@ -41,7 +41,6 @@ type CompletedExecState = {
 };
 
 const defaultPrompt = "TERMDEM> ";
-const promptMarker = "\u001eTD_PROMPT\u001e";
 
 export async function createPaneSession(options: PaneSessionOptions = {}): Promise<PaneSession> {
   const prompt = options.prompt ?? defaultPrompt;
@@ -54,6 +53,8 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
     throw new Error("Only bash shells are currently supported");
   }
 
+  const promptMarker = `TD_PROMPT:${randomUUID()}`;
+  const promptMarkerVariable = `TERMDEM_PROMPT_MARKER_${randomUUID().replaceAll("-", "_")}`;
   const shellArgs = ["--noprofile", "--norc", "-i"];
   const pty = spawn(shell, shellArgs, {
     name: "xterm-256color",
@@ -68,13 +69,14 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
       LESS: "FRX",
       MANPAGER: "cat",
       PAGER: "cat",
+      [promptMarkerVariable]: `\u001e${promptMarker}\u001e`,
       TERM: "xterm-256color",
-      PS1: `${prompt}${promptMarker}`,
+      PS1: `${prompt}$(printf '%s' "$${promptMarkerVariable}")`,
       PROMPT_COMMAND: "",
     },
   });
 
-  const session = new NodePtyPaneSession(pty, prompt, options.onOutput);
+  const session = new NodePtyPaneSession(pty, prompt, promptMarker, options.onOutput);
   await session.bootstrap();
   return session;
 }
@@ -82,6 +84,7 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
 class NodePtyPaneSession implements PaneSession {
   private readonly pty: IPty;
   private readonly prompt: string;
+  private readonly promptMarker: string;
   private readonly onOutput: ((chunk: string) => void) | undefined;
   private readonly promptPattern: RegExp;
   private readonly outputListener;
@@ -95,9 +98,10 @@ class NodePtyPaneSession implements PaneSession {
   private alternateScreenActive = false;
   private hiddenOutputUntilPrompt = 0;
 
-  constructor(pty: IPty, prompt: string, onOutput?: (chunk: string) => void) {
+  constructor(pty: IPty, prompt: string, promptMarker: string, onOutput?: (chunk: string) => void) {
     this.pty = pty;
     this.prompt = prompt;
+    this.promptMarker = promptMarker;
     this.onOutput = onOutput;
     this.promptPattern = new RegExp(`^${escapeRegExp(prompt)}$`, "u");
     this.outputListener = this.pty.onData((data) => {
@@ -327,7 +331,7 @@ class NodePtyPaneSession implements PaneSession {
   }
 
   private handleMarker(marker: string) {
-    if (marker === "TD_PROMPT") {
+    if (marker === this.promptMarker) {
       if (this.hiddenOutputUntilPrompt > 0) {
         this.hiddenOutputUntilPrompt -= 1;
       }
