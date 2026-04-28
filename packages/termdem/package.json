@@ -1,30 +1,55 @@
 {
   "name": "@akuederle/termdem",
-  "version": "0.0.0",
-  "description": "A starter for creating a TypeScript package.",
-  "homepage": "https://github.com/author/library#readme",
+  "version": "0.1.0",
+  "description": "Create complex terminal demo videos using JavaScript and TypeScript.",
+  "keywords": [
+    "demo",
+    "playwright",
+    "react",
+    "recording",
+    "terminal",
+    "typescript"
+  ],
+  "homepage": "https://github.com/AKuederle/termdem#readme",
   "bugs": {
-    "url": "https://github.com/author/library/issues"
+    "url": "https://github.com/AKuederle/termdem/issues"
   },
   "license": "MIT",
-  "author": "Author Name <author.name@mail.com>",
+  "author": "Arne Kuederle <a.kuederle@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/author/library.git"
+    "url": "git+https://github.com/AKuederle/termdem.git",
+    "directory": "packages/termdem"
   },
   "bin": {
-    "termdem": "./dist/cli.mjs"
+    "termdem": "dist/cli.mjs"
   },
   "files": [
     "dist"
   ],
   "type": "module",
+  "types": "./dist/index.d.mts",
   "exports": {
-    ".": "./dist/index.mjs",
-    "./cli": "./dist/cli.mjs",
-    "./preview-client": "./dist/preview-client.mjs",
-    "./preview-server": "./dist/preview-server.mjs",
-    "./protocol": "./dist/protocol.mjs",
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./cli": {
+      "types": "./dist/cli.d.mts",
+      "default": "./dist/cli.mjs"
+    },
+    "./preview-client": {
+      "types": "./dist/preview-client.d.mts",
+      "default": "./dist/preview-client.mjs"
+    },
+    "./preview-server": {
+      "types": "./dist/preview-server.d.mts",
+      "default": "./dist/preview-server.mjs"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.mts",
+      "default": "./dist/protocol.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -35,6 +60,7 @@
     "dev": "vp pack --watch",
     "test": "vp test run --tagsFilter '!smoke'",
     "check": "vp check",
+    "prepack": "cp ../../README.md README.md && cp ../../LICENSE LICENSE",
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
@@ -58,5 +84,8 @@
     "bumpp": "^11.0.1",
     "typescript": "^6.0.2",
     "vite-plus": "^0.1.14"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

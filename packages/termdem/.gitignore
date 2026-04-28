@@ -1,4 +1,6 @@
 node_modules
 dist
+README.md
+LICENSE
 *.log
 .DS_Store
