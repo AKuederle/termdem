@@ -24,6 +24,9 @@ catalogs:
     '@vitejs/plugin-react':
       specifier: ^6.0.1
       version: 6.0.1
+    '@wterm/dom':
+      specifier: ^0.1.9
+      version: 0.1.9
     '@wterm/react':
       specifier: ^0.1.9
       version: 0.1.9
@@ -104,6 +107,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: 'catalog:'
         version: 6.0.1(vite@8.0.9(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))
+      '@wterm/dom':
+        specifier: 'catalog:'
+        version: 0.1.9
       '@wterm/react':
         specifier: 'catalog:'
         version: 0.1.9(@wterm/dom@0.1.9)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)

@@ -75,6 +75,88 @@ export type TerminalWorkspaceProvider = {
   acquire(): Promise<TerminalWorkspace>;
 };
 
+type WorkspaceAllocator = {
+  cleanup(cwd: string): Awaitable<void>;
+  setup(): Promise<string>;
+};
+
+class SharedWorkspaceProvider implements TerminalWorkspaceProvider {
+  #allocation: Promise<string> | null = null;
+  #cleanup: Promise<void> | null = null;
+  #cwd: string | null = null;
+  #references = 0;
+
+  constructor(private readonly allocator: WorkspaceAllocator) {}
+
+  async acquire(): Promise<TerminalWorkspace> {
+    const cwd = await this.#ensureCwd();
+    this.#references += 1;
+
+    let disposed = false;
+    return {
+      cwd,
+      dispose: async () => {
+        if (disposed) {
+          return;
+        }
+
+        disposed = true;
+        this.#references -= 1;
+        if (this.#references === 0) {
+          await this.#release();
+        }
+      },
+    };
+  }
+
+  async #ensureCwd(): Promise<string> {
+    if (this.#cleanup) {
+      await this.#cleanup;
+    }
+
+    if (this.#cwd) {
+      return this.#cwd;
+    }
+
+    if (!this.#allocation) {
+      this.#allocation = this.allocator.setup();
+    }
+
+    this.#cwd = await this.#allocation;
+    return this.#cwd;
+  }
+
+  async #release(): Promise<void> {
+    if (this.#cleanup) {
+      await this.#cleanup;
+      return;
+    }
+
+    if (this.#allocation) {
+      try {
+        await this.#allocation;
+      } catch {
+        return;
+      }
+    }
+
+    if (!this.#cwd) {
+      return;
+    }
+
+    const cwd = this.#cwd;
+    this.#cwd = null;
+    this.#allocation = null;
+    const cleanup = Promise.resolve(this.allocator.cleanup(cwd)).finally(() => {
+      if (this.#cleanup === cleanup) {
+        this.#cleanup = null;
+      }
+    });
+    this.#cleanup = cleanup;
+    await cleanup;
+  }
+}
+
 /**
  * Defines one terminal pane for a demo.
  */
@@ -138,106 +220,23 @@ export type TerminalWorkspaceDefinition = {
  * });
  * ```
  */
-export class Dir {
-  #allocation: Promise<string> | null = null;
-  #cleanup: Promise<void> | null = null;
-  #cwd: string | null = null;
-  #path: string;
-  #references = 0;
-  #setup: DirSetup | undefined;
-  #teardown: DirTeardown | undefined;
-
+export class Dir extends SharedWorkspaceProvider {
   /**
    * Creates a reusable workspace provider.
    *
    * @param options - Workspace path and optional setup/teardown hooks.
    */
   constructor(options: DirOptions) {
-    this.#path = options.path;
-    this.#setup = options.setup;
-    this.#teardown = options.teardown;
-  }
-
-  /**
-   * Acquires this workspace for one terminal.
-   *
-   * Most demo authors do not need to call this directly; pass the `Dir` instance as
-   * `pwd` in a terminal definition instead.
-   *
-   * @returns A workspace handle with the directory path and a `dispose()` function.
-   */
-  async acquire(): Promise<TerminalWorkspace> {
-    const cwd = await this.#ensureCwd();
-    this.#references += 1;
-
-    let disposed = false;
-    return {
-      cwd,
-      dispose: async () => {
-        if (disposed) {
-          return;
-        }
-
-        disposed = true;
-        this.#references -= 1;
-        if (this.#references === 0) {
-          await this.#release();
-        }
+    super({
+      cleanup: async (cwd) => {
+        await options.teardown?.(cwd);
       },
-    };
-  }
-
-  async #release(): Promise<void> {
-    if (this.#cleanup) {
-      await this.#cleanup;
-      return;
-    }
-
-    if (this.#allocation) {
-      try {
-        await this.#allocation;
-      } catch {
-        return;
-      }
-    }
-
-    if (!this.#cwd) {
-      return;
-    }
-
-    const cwd = this.#cwd;
-    this.#cwd = null;
-    this.#allocation = null;
-    const cleanup = Promise.resolve(this.#teardown?.(cwd)).finally(() => {
-      if (this.#cleanup === cleanup) {
-        this.#cleanup = null;
-      }
+      setup: async () => {
+        const cwd = options.path;
+        await options.setup?.(cwd);
+        return cwd;
+      },
     });
-    this.#cleanup = cleanup;
-    await cleanup;
-  }
-
-  async #ensureCwd(): Promise<string> {
-    if (this.#cleanup) {
-      await this.#cleanup;
-    }
-
-    if (this.#cwd) {
-      return this.#cwd;
-    }
-
-    if (!this.#allocation) {
-      this.#allocation = this.#setupCwd();
-    }
-
-    return this.#allocation;
-  }
-
-  async #setupCwd() {
-    const cwd = this.#path;
-    await this.#setup?.(cwd);
-    this.#cwd = cwd;
-    return cwd;
   }
 }
 
@@ -277,119 +276,34 @@ export class Dir {
  * });
  * ```
  */
-export class TmpDir {
-  #allocation: Promise<string> | null = null;
-  #cleanup: Promise<void> | null = null;
-  #cwd: string | null = null;
-  #references = 0;
-  #setup: TmpDirSetup | undefined;
-  #teardown: TmpDirSetup | undefined;
-
+export class TmpDir extends SharedWorkspaceProvider {
   /**
    * Creates a temporary workspace provider.
    *
    * @param options - Workspace setup/teardown hooks.
    */
   constructor(options: TmpDirOptions = {}) {
-    this.#setup = options.setup;
-    this.#teardown = options.teardown;
-  }
-
-  /**
-   * Acquires this workspace for one terminal.
-   *
-   * Most demo authors do not need to call this directly; pass the `TmpDir` instance
-   * as `pwd` in a terminal definition instead.
-   *
-   * @returns A workspace handle with the directory path and a `dispose()` function.
-   */
-  async acquire(): Promise<TerminalWorkspace> {
-    const cwd = await this.#ensureCwd();
-    this.#references += 1;
-
-    let disposed = false;
-    return {
-      cwd,
-      dispose: async () => {
-        if (disposed) {
-          return;
-        }
-
-        disposed = true;
-        this.#references -= 1;
-        if (this.#references === 0) {
-          await this.#release();
-        }
-      },
-    };
-  }
-
-  async #release(): Promise<void> {
-    if (this.#cleanup) {
-      await this.#cleanup;
-      return;
-    }
-
-    if (this.#allocation) {
-      try {
-        await this.#allocation;
-      } catch {
-        return;
-      }
-    }
-
-    if (!this.#cwd) {
-      return;
-    }
-
-    const cwd = this.#cwd;
-    this.#cwd = null;
-    this.#allocation = null;
-    const cleanup = Promise.resolve()
-      .then(async () => {
+    super({
+      cleanup: async (cwd) => {
         try {
-          await this.#teardown?.(cwd);
+          await options.teardown?.(cwd);
         } finally {
           await rm(cwd, { recursive: true, force: true });
         }
-      })
-      .finally(() => {
-        if (this.#cleanup === cleanup) {
-          this.#cleanup = null;
+      },
+      setup: async () => {
+        const cwd = await mkdtemp(join(tmpdir(), "termdem-"));
+
+        try {
+          await options.setup?.(cwd);
+        } catch (error) {
+          await rm(cwd, { recursive: true, force: true });
+          throw error;
         }
-      });
-    this.#cleanup = cleanup;
-    await cleanup;
-  }
 
-  async #ensureCwd(): Promise<string> {
-    if (this.#cleanup) {
-      await this.#cleanup;
-    }
-
-    if (this.#cwd) {
-      return this.#cwd;
-    }
-
-    if (!this.#allocation) {
-      this.#allocation = this.#setupCwd();
-    }
-
-    return this.#allocation;
-  }
-
-  async #setupCwd() {
-    const cwd = await mkdtemp(join(tmpdir(), "termdem-"));
-
-    try {
-      await this.#setup?.(cwd);
-    } catch (error) {
-      await rm(cwd, { recursive: true, force: true });
-      throw error;
-    }
-
-    this.#cwd = cwd;
-    return cwd;
+        return cwd;
+      },
+    });
   }
 }
 

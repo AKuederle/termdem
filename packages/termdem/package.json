@@ -67,6 +67,7 @@
   "dependencies": {
     "@tailwindcss/vite": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "@wterm/dom": "catalog:",
     "@wterm/react": "catalog:",
     "node-pty": "^1.1.0",
     "playwright": "catalog:",
