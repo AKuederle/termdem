@@ -87,6 +87,7 @@ test("pane sessions can type a command and press Enter against a real shell", as
     await waitFor(() => visibleOutput.join("").includes("hello"));
 
     const transcript = visibleOutput.join("");
+    expect(transcript.startsWith("TERMDEM> printf 'hello'")).toBe(true);
     expect(transcript).toContain("printf 'hello'");
     expect(transcript).toContain("hello");
   } finally {

@@ -109,6 +109,7 @@ class NodePtyPaneSession implements PaneSession {
 
     this.bootstrapping = false;
     this.dataBuffer = "";
+    this.emitVisible(this.prompt);
   }
 
   async type(text: string, options: TypeOptions = {}) {
