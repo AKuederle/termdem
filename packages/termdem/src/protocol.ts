@@ -272,8 +272,8 @@ function parsePaneScreenSnapshot(value: unknown): PaneScreenSnapshot | null {
   const cursorRecord = cursor as Record<string, unknown>;
   if (
     typeof snapshot.altScreen !== "boolean" ||
-    !isPositiveInteger(snapshot.cols) ||
-    !isPositiveInteger(snapshot.rows) ||
+    !isNonNegativeInteger(snapshot.cols) ||
+    !isNonNegativeInteger(snapshot.rows) ||
     !isNonNegativeInteger(snapshot.scrollbackCount) ||
     typeof snapshot.text !== "string" ||
     !Array.isArray(snapshot.lines) ||

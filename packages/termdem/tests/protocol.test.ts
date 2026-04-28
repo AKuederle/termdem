@@ -67,6 +67,40 @@ test("parseBrowserToServerMessage accepts pane screen responses", () => {
   });
 });
 
+test("parseBrowserToServerMessage accepts empty pane screen responses before bridge readiness", () => {
+  expect(
+    parseBrowserToServerMessage(
+      JSON.stringify({
+        type: "pane.screen.response",
+        pane: "server",
+        requestId: "screen-1",
+        snapshot: {
+          altScreen: false,
+          cols: 0,
+          cursor: { col: 0, row: 0, visible: false },
+          lines: [],
+          rows: 0,
+          scrollbackCount: 0,
+          text: "",
+        },
+      }),
+    ),
+  ).toEqual({
+    type: "pane.screen.response",
+    pane: "server",
+    requestId: "screen-1",
+    snapshot: {
+      altScreen: false,
+      cols: 0,
+      cursor: { col: 0, row: 0, visible: false },
+      lines: [],
+      rows: 0,
+      scrollbackCount: 0,
+      text: "",
+    },
+  });
+});
+
 test("parseBrowserToServerMessage accepts playbook controls and rejects browser playbook actions", () => {
   expect(parseBrowserToServerMessage(JSON.stringify({ type: "playbook.start" }))).toEqual({
     type: "playbook.start",
