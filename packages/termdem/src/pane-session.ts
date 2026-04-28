@@ -3,6 +3,7 @@ import { stripVTControlCharacters } from "node:util";
 import { spawn, type IPty } from "node-pty";
 import { normalizeExecCapture } from "./normalize.ts";
 import { typingDelays } from "./typing-delays.ts";
+import { normalizeTypableText, typableTextValue, type TypableText } from "./typed-string.ts";
 import type { ExecOptions, ExecResult, PaneController, PressKey, TypeOptions } from "./types.ts";
 
 export type PaneSessionOptions = {
@@ -183,9 +184,10 @@ class NodePtyPaneSession implements PaneSession {
     });
   }
 
-  async exec(command: string, options: PaneSessionExecOptions = {}) {
+  async exec(command: TypableText, options: PaneSessionExecOptions = {}) {
     return this.enqueue(async () => {
-      const pending = await this.beginExec(command, { visible: true });
+      const commandText = typableTextValue(command);
+      const pending = await this.beginExec(commandText, { visible: true });
       await this.performType(command, {
         typeDelayMs: options.typeDelayMs,
         waitForActive: options.waitForActive,
@@ -193,7 +195,7 @@ class NodePtyPaneSession implements PaneSession {
       await options.waitForActive?.();
       this.emitInputVisible("\r\n");
       this.pty.write("\x15");
-      this.pty.write(buildExecShellCommand(command, pending.id));
+      this.pty.write(buildExecShellCommand(commandText, pending.id));
       this.pty.write("\r");
       return pending.result;
     });
@@ -257,12 +259,14 @@ class NodePtyPaneSession implements PaneSession {
     this.pty.kill();
   }
 
-  private async performType(text: string, options: PaneSessionTypeOptions = {}) {
-    for (const char of text) {
-      await options.waitForActive?.();
-      this.emitInputVisible(char);
-      this.pty.write(char);
-      await sleep(options.typeDelayMs ?? typingDelays.WPM_60);
+  private async performType(text: TypableText, options: PaneSessionTypeOptions = {}) {
+    for (const segment of normalizeTypableText(text)) {
+      for (const char of segment.text) {
+        await options.waitForActive?.();
+        this.emitInputVisible(char);
+        this.pty.write(char);
+        await sleep(segment.typeDelayMs ?? options.typeDelayMs ?? typingDelays.WPM_60);
+      }
     }
   }
 

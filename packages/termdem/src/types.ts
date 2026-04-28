@@ -1,5 +1,6 @@
 import type { KeySequence } from "./keys.ts";
 import type { PaneScreenSnapshot } from "./protocol.ts";
+import type { TypableText } from "./typed-string.ts";
 
 export type { PaneScreenSnapshot } from "./protocol.ts";
 
@@ -144,7 +145,7 @@ export interface PaneController {
    * console.log(result.text);
    * ```
    */
-  exec(command: string, options?: ExecOptions): Promise<ExecResult>;
+  exec(command: TypableText, options?: ExecOptions): Promise<ExecResult>;
 
   /**
    * Types a shell command visibly and presses Enter without waiting for it to finish.

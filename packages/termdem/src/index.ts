@@ -3,6 +3,8 @@ export { keys } from "./keys.ts";
 export type { KeySequence } from "./keys.ts";
 export { typingDelays } from "./typing-delays.ts";
 export type { TypingDelay } from "./typing-delays.ts";
+export { typedString } from "./typed-string.ts";
+export type { TypableText, TypedString, TypedStringOptions } from "./typed-string.ts";
 export {
   Dir,
   TmpDir,

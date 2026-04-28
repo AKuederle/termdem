@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { stripVTControlCharacters } from "node:util";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
-import { Dir, keys, quoteShellArg, TmpDir, typingDelays } from "../src/index.ts";
+import { Dir, keys, quoteShellArg, TmpDir, typedString, typingDelays } from "../src/index.ts";
 import { normalizeExecCapture } from "../src/normalize.ts";
 import { createPaneSession } from "../src/pane-session.ts";
 import { resolveRecordingConfig } from "../src/recording-config.ts";
@@ -245,6 +245,30 @@ test("pane sessions can chain exec results from ls into cat", async () => {
     expect(transcript).toContain("command ls -1 --color=never");
     expect(transcript).toContain(`cat '${firstFile}'`);
     expect(transcript).toContain("alpha file");
+  } finally {
+    await session.close();
+  }
+});
+
+test("pane sessions execute composed typed command text", async () => {
+  const visibleOutput: string[] = [];
+  const session = await createPaneSession({
+    onOutput(chunk) {
+      visibleOutput.push(chunk);
+    },
+  });
+
+  try {
+    const result = await session.exec(
+      ["printf ", typedString("'pasted'", { typeDelayMs: 0 }), " && printf ' slow'"],
+      { typeDelayMs: 25 },
+    );
+
+    expect(result.command).toBe("printf 'pasted' && printf ' slow'");
+    expect(result.text).toBe("pasted slow");
+
+    const transcript = visibleOutput.join("");
+    expect(transcript).toContain("printf 'pasted' && printf ' slow'");
   } finally {
     await session.close();
   }
