@@ -69,14 +69,19 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
       LESS: "FRX",
       MANPAGER: "cat",
       PAGER: "cat",
-      [promptMarkerVariable]: `\u001e${promptMarker}\u001e`,
       TERM: "xterm-256color",
-      PS1: `${prompt}$(printf '%s' "$${promptMarkerVariable}")`,
+      PS1: prompt,
       PROMPT_COMMAND: "",
     },
   });
 
-  const session = new NodePtyPaneSession(pty, prompt, promptMarker, options.onOutput);
+  const session = new NodePtyPaneSession(
+    pty,
+    prompt,
+    promptMarker,
+    promptMarkerVariable,
+    options.onOutput,
+  );
   await session.bootstrap();
   return session;
 }
@@ -85,6 +90,7 @@ class NodePtyPaneSession implements PaneSession {
   private readonly pty: IPty;
   private readonly prompt: string;
   private readonly promptMarker: string;
+  private readonly promptMarkerVariable: string;
   private readonly onOutput: ((chunk: string) => void) | undefined;
   private readonly promptPattern: RegExp;
   private readonly outputListener;
@@ -98,10 +104,17 @@ class NodePtyPaneSession implements PaneSession {
   private alternateScreenActive = false;
   private hiddenOutputUntilPrompt = 0;
 
-  constructor(pty: IPty, prompt: string, promptMarker: string, onOutput?: (chunk: string) => void) {
+  constructor(
+    pty: IPty,
+    prompt: string,
+    promptMarker: string,
+    promptMarkerVariable: string,
+    onOutput?: (chunk: string) => void,
+  ) {
     this.pty = pty;
     this.prompt = prompt;
     this.promptMarker = promptMarker;
+    this.promptMarkerVariable = promptMarkerVariable;
     this.onOutput = onOutput;
     this.promptPattern = new RegExp(`^${escapeRegExp(prompt)}$`, "u");
     this.outputListener = this.pty.onData((data) => {
@@ -111,13 +124,24 @@ class NodePtyPaneSession implements PaneSession {
 
   async bootstrap() {
     await this.waitForPrompt();
-    this.pty.write("stty -echo\r");
+    this.pty.write(`${this.buildBootstrapCommand()}\r`);
     this.dataBuffer = "";
     await this.waitForPrompt();
 
     this.bootstrapping = false;
     this.dataBuffer = "";
     this.emitVisible(this.prompt);
+  }
+
+  private buildBootstrapCommand() {
+    const markerValue = `\u001e${this.promptMarker}\u001e`;
+    const promptRecipe = `${this.prompt}$(printf '%s' "$${this.promptMarkerVariable}")`;
+    return [
+      `${this.promptMarkerVariable}=${shQuote(markerValue)}`,
+      `PS1=${shQuote(promptRecipe)}`,
+      "PROMPT_COMMAND=",
+      "stty -echo",
+    ].join("; ");
   }
 
   async type(text: string, options: TypeOptions = {}) {

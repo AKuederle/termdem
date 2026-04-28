@@ -120,7 +120,7 @@ test("pane sessions hide prompt-like output from hidden input without hiding vis
 
   try {
     await session.typeHidden(
-      "printf \"$PS1\"\rprintf hidden-after-ps1\rprintf 'fake PROMPT> '\rprintf hidden-second\r",
+      "printf \"$PS1\"\rprintf hidden-after-ps1\renv | grep TERMDEM_PROMPT_MARKER || true\rprintf hidden-after-env\rprintf 'fake PROMPT> '\rprintf hidden-second\r",
       {
         typeDelayMs: 0,
       },
@@ -136,6 +136,7 @@ test("pane sessions hide prompt-like output from hidden input without hiding vis
     const transcript = visibleOutput.join("");
     expect(transcript).toContain("visible-after-hidden");
     expect(transcript).not.toContain("hidden-after-ps1");
+    expect(transcript).not.toContain("hidden-after-env");
     expect(transcript).not.toContain("fake PROMPT");
     expect(transcript).not.toContain("hidden-second");
     expect(transcript).not.toContain("TD_PROMPT");
