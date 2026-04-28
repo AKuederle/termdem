@@ -1,6 +1,12 @@
-import { Pane, Stage, TmpDir, createTerminalDemo, type TerminalHandles } from "@akuederle/termdem";
+import {
+  Pane,
+  Stage,
+  TmpDir,
+  createTerminalDemo,
+  keys,
+  type TerminalHandles,
+} from "@akuederle/termdem";
 
-const ESC = "\x1b";
 const VIM = "vim -Nu NONE -n -i NONE";
 
 const repo = new TmpDir({
@@ -25,24 +31,24 @@ const demo = createTerminalDemo(
     });
 
     await git.type(`${VIM} README.md`, { delayMs: 24 });
-    await git.press("Enter");
-    await sleep(600);
+    await git.press(keys.ENTER);
+    await api.wait(600);
     await git.type("i# termdem git demo\n\nCreated from raw Vim keystrokes.\n", { delayMs: 18 });
-    await git.type(ESC);
-    await sleep(100);
+    await git.type(keys.ESC);
+    await api.wait(100);
     await git.type(":wq", { delayMs: 28 });
-    await git.press("Enter");
-    await sleep(600);
+    await git.press(keys.ENTER);
+    await api.wait(600);
 
     await git.type(`${VIM} README.md`, { delayMs: 24 });
-    await git.press("Enter");
-    await sleep(600);
+    await git.press(keys.ENTER);
+    await api.wait(600);
     await git.type("Go\nEdited in a second Vim session.\n", { delayMs: 18 });
-    await git.type(ESC);
-    await sleep(100);
+    await git.type(keys.ESC);
+    await api.wait(100);
     await git.type(":wq", { delayMs: 28 });
-    await git.press("Enter");
-    await sleep(600);
+    await git.press(keys.ENTER);
+    await api.wait(600);
 
     await git.exec("git add README.md", { typeDelayMs: 20 });
     await git.exec("git commit -m 'Create README through vim'", { typeDelayMs: 20 });
@@ -63,8 +69,4 @@ export function render(terminals: TerminalHandles<typeof demo>) {
       </main>
     </Stage>
   );
-}
-
-async function sleep(delayMs: number) {
-  await new Promise((resolve) => setTimeout(resolve, delayMs));
 }

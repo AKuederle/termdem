@@ -15,6 +15,7 @@ export type TerminalHandles<TDemo extends TerminalDemo<readonly TerminalDefiniti
 
 export type TerminalDemoScriptApi<Name extends string> = {
   pane(name: Name): PaneController;
+  wait(delayMs: number): Promise<void>;
 };
 
 export type TerminalDemo<

@@ -138,7 +138,7 @@ export function parsePaneClientMessage(raw: string): PaneClientMessage | null {
         delayMs: payload.delayMs,
       };
     case "pane.press":
-      if (payload.key !== "Enter") {
+      if (payload.key !== "Enter" && payload.key !== "\r") {
         return null;
       }
       return {

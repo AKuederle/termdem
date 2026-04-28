@@ -39,6 +39,24 @@ test("parsePaneClientMessage accepts action ids for ordered keystrokes", () => {
   });
 });
 
+test("parsePaneClientMessage accepts raw enter key presses", () => {
+  const message = parsePaneClientMessage(
+    JSON.stringify({
+      type: "pane.press",
+      id: "action-2",
+      pane: "main",
+      key: "\r",
+    }),
+  );
+
+  expect(message).toEqual({
+    type: "pane.press",
+    id: "action-2",
+    pane: "main",
+    key: "\r",
+  });
+});
+
 test("parsePaneClientMessage rejects malformed pane messages", () => {
   expect(
     parsePaneClientMessage(

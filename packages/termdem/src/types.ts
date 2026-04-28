@@ -1,4 +1,4 @@
-export type PressKey = "Enter";
+export type PressKey = "Enter" | "\r";
 
 export type TypeOptions = {
   delayMs?: number;

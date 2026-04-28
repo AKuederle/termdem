@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { stripVTControlCharacters } from "node:util";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
-import { Dir, execNode, ExecNodeError, quoteShellArg, TmpDir } from "../src/index.ts";
+import { Dir, execNode, ExecNodeError, keys, quoteShellArg, TmpDir } from "../src/index.ts";
 import { normalizeExecCapture } from "../src/normalize.ts";
 import { createPaneSession } from "../src/pane-session.ts";
 import { resolveRecordingConfig } from "../src/recording-config.ts";
@@ -204,6 +204,14 @@ test("quoteShellArg wraps shell arguments and escapes single quotes", () => {
   expect(quoteShellArg("two words")).toBe("'two words'");
   expect(quoteShellArg("it's.txt")).toBe("'it'\\''s.txt'");
   expect(quoteShellArg("")).toBe("''");
+});
+
+test("keys exposes common raw terminal input sequences", () => {
+  expect(keys.ESC).toBe("\x1b");
+  expect(keys.ENTER).toBe("\r");
+  expect(keys.TAB).toBe("\t");
+  expect(keys.ARROW_UP).toBe("\x1b[A");
+  expect(keys.CTRL_C).toBe("\x03");
 });
 
 test("execNode executes a Node script and captures output", async () => {

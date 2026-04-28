@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "rea
 import { createRoot } from "react-dom/client";
 import { Terminal, useTerminal } from "@wterm/react";
 import "@wterm/react/css";
+import { waitForPlaybookDelay } from "./playbook-wait.ts";
 import { parsePaneServerMessage, type PaneClientMessage } from "./protocol.ts";
 import { collectPaneDefinitions, renderStageScene, type PaneDefinition } from "./scene.ts";
 import type { ExecResult, PaneController, PressKey, TypeOptions } from "./types.ts";
@@ -10,7 +11,10 @@ type PreviewMode = "running" | "stopped";
 
 type PreviewDemoModule = {
   render: (terminals: Record<string, { name: string }>) => ReactNode;
-  script?: (api: { pane(name: string): PaneController }) => Promise<void> | void;
+  script?: (api: {
+    pane(name: string): PaneController;
+    wait(delayMs: number): Promise<void>;
+  }) => Promise<void> | void;
   terminals: Record<string, { name: string }>;
 };
 
@@ -482,6 +486,11 @@ function createPlaybookApi(
   waitForPlaybookActive: () => Promise<void>,
 ) {
   return {
+    async wait(delayMs: number) {
+      await runPaneAction(`wait(${delayMs})`, async () => {
+        await waitForPlaybookDelay(delayMs, waitForPlaybookActive);
+      });
+    },
     pane(name: string): PaneController {
       const runtime = runtimes.get(name);
       if (!runtime?.ready) {

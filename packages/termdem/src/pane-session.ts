@@ -107,7 +107,7 @@ class NodePtyPaneSession implements PaneSession {
 
   async press(key: PressKey) {
     await this.enqueue(async () => {
-      if (key !== "Enter") {
+      if (key !== "Enter" && key !== "\r") {
         throw new Error("Unsupported key");
       }
 

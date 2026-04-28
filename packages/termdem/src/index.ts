@@ -1,5 +1,7 @@
 export { ExecNodeError, execNode, quoteShellArg } from "./helpers.ts";
 export type { ExecNodeOptions, ExecNodeResult } from "./helpers.ts";
+export { keys } from "./keys.ts";
+export type { KeySequence } from "./keys.ts";
 export {
   Dir,
   TmpDir,
