@@ -28,4 +28,11 @@ export {
   type TerminalDemoSetup,
   type TerminalDemoTeardown,
 } from "./terminal-demo.ts";
-export type { ExecOptions, ExecResult, PaneController, PressKey, TypeOptions } from "./types.ts";
+export type {
+  ExecOptions,
+  ExecResult,
+  PaneController,
+  PaneScreenSnapshot,
+  PressKey,
+  TypeOptions,
+} from "./types.ts";

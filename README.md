@@ -213,6 +213,21 @@ const url = result.lines.find((line) => line.startsWith("CHAT_URL="))?.slice("CH
 await api.pane("client").exec(`node client.mjs ${quoteShellArg(url)}`);
 ```
 
+### Reading long-running terminal screens
+
+Use `pane.screen()` after starting a long-running command with `sendLine()` when you need the terminal's current rendered buffer.
+This works for output that redraws in place, such as `watch`, progress UIs, and dev servers.
+
+```ts
+const server = api.pane("server");
+await server.sendLine("pnpm dev");
+
+await api.waitFor("dev server ready", async () => {
+  const screen = await server.screen();
+  return screen.text.includes("Local:");
+});
+```
+
 ### "Hidden" Commands
 
 Use normal JavaScript inside `script`, `setup`, and `teardown` for values that do not need a shell, and use `api.node.exec()` for hidden subprocesses.
