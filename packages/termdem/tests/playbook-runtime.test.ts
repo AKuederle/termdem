@@ -5,6 +5,7 @@ import { afterEach, expect, test } from "vite-plus/test";
 import { keys } from "../src/keys.ts";
 import { PlaybookRuntime } from "../src/playbook-runtime.ts";
 import { createPaneSession } from "../src/pane-session.ts";
+import type { NodeExecResult } from "../src/types.ts";
 import { TmpDir } from "../src/workspace.ts";
 
 const cleanupPaths: string[] = [];
@@ -51,25 +52,33 @@ test("node exec captures stdout, stderr, exit code, timeout, and reject behavior
     terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
     typeDelayMs: 0,
   });
+  let rejectionMessage = "";
+  let result: NodeExecResult | undefined;
+  let timeoutExitCode: number | undefined;
 
   await runtime.run(async (api) => {
-    await expect(api.node.exec(process.execPath, [scriptPath, "7"], { cwd })).rejects.toThrow(
-      "exited with code 7",
-    );
+    try {
+      await api.node.exec(process.execPath, [scriptPath, "7"], { cwd });
+    } catch (error) {
+      rejectionMessage = error instanceof Error ? error.message : String(error);
+    }
 
-    const result = await api.node.exec(process.execPath, [scriptPath, "7"], {
+    result = await api.node.exec(process.execPath, [scriptPath, "7"], {
       cwd,
       reject: false,
     });
-    expect(result).toEqual({ exitCode: 7, stderr: "err", stdout: "out" });
 
     const timeout = await api.node.exec(process.execPath, [scriptPath, "0"], {
       cwd,
       reject: false,
       timeoutMs: 1,
     });
-    expect(timeout.exitCode).not.toBe(0);
+    timeoutExitCode = timeout.exitCode;
   });
+
+  expect(rejectionMessage).toContain("exited with code 7");
+  expect(result).toEqual({ exitCode: 7, stderr: "err", stdout: "out" });
+  expect(timeoutExitCode).not.toBe(0);
 });
 
 test("playbook runtime retries waitFor probes and reports timeout labels", async () => {
