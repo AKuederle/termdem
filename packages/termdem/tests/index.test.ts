@@ -135,6 +135,21 @@ test("pane sessions wait for bootstrap prompt markers before exposing output", a
   }
 });
 
+test("pane sessions track cwd from shell prompts", async () => {
+  const cwd = await createTempDir();
+  const session = await createPaneSession({ cwd });
+
+  try {
+    expect(await session.cwd()).toBe(cwd);
+
+    await session.exec("mkdir 'space dir' && cd 'space dir'", { typeDelayMs: 0 });
+
+    expect(await session.cwd()).toBe(join(cwd, "space dir"));
+  } finally {
+    await session.close();
+  }
+});
+
 test("pane sessions hide prompt-like output from hidden input without hiding visible work", async () => {
   const visibleOutput: string[] = [];
   const session = await createPaneSession({

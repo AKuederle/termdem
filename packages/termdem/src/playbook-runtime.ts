@@ -305,6 +305,10 @@ export class PlaybookRuntime<Name extends string = string> {
     });
 
     return {
+      cwd: async (): Promise<string> => {
+        await this.ensureActive(generation, actionName("cwd"));
+        return this.readyPane(name).cwd();
+      },
       exec: async (command: string, options?: ExecOptions): Promise<ExecResult> => {
         await this.ensureActive(generation, actionName("exec"));
         if (controllerOptions.hiddenPaneExec) {

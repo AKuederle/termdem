@@ -55,12 +55,13 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
 
   const promptMarker = `TD_PROMPT:${randomUUID()}`;
   const promptMarkerVariable = `TERMDEM_PROMPT_MARKER_${randomUUID().replaceAll("-", "_")}`;
+  const cwd = options.cwd ?? process.cwd();
   const shellArgs = ["--noprofile", "--norc", "-i"];
   const pty = spawn(shell, shellArgs, {
     name: "xterm-256color",
     cols: options.cols ?? 120,
     rows: options.rows ?? 30,
-    cwd: options.cwd ?? process.cwd(),
+    cwd,
     env: {
       ...process.env,
       DELTA_PAGER: "cat",
@@ -80,6 +81,7 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
     prompt,
     promptMarker,
     promptMarkerVariable,
+    cwd,
     options.onOutput,
   );
   await session.bootstrap();
@@ -103,18 +105,21 @@ class NodePtyPaneSession implements PaneSession {
   private bootstrapping = true;
   private alternateScreenActive = false;
   private hiddenOutputUntilPrompt = 0;
+  private currentCwd: string;
 
   constructor(
     pty: IPty,
     prompt: string,
     promptMarker: string,
     promptMarkerVariable: string,
+    cwd: string,
     onOutput?: (chunk: string) => void,
   ) {
     this.pty = pty;
     this.prompt = prompt;
     this.promptMarker = promptMarker;
     this.promptMarkerVariable = promptMarkerVariable;
+    this.currentCwd = cwd;
     this.onOutput = onOutput;
     this.promptPattern = new RegExp(`^${escapeRegExp(prompt)}$`, "u");
     this.outputListener = this.pty.onData((data) => {
@@ -137,12 +142,19 @@ class NodePtyPaneSession implements PaneSession {
   }
 
   private buildBootstrapCommand() {
-    const promptRecipe = `${this.prompt}$(printf '%s' "$${this.promptMarkerVariable}")`;
+    const promptRecipe = [
+      this.prompt,
+      `$(printf '\\036%s:%s\\036' "$${this.promptMarkerVariable}" "$(printf '%s' "$PWD" | base64 | tr -d '\\n')")`,
+    ].join("");
     return [
-      `${this.promptMarkerVariable}=$'\\036${this.promptMarker}\\036'`,
+      `${this.promptMarkerVariable}=${shQuote(this.promptMarker)}`,
       `PS1=${shQuote(promptRecipe)}`,
       "PROMPT_COMMAND=",
     ].join("; ");
+  }
+
+  async cwd() {
+    return this.enqueue(async () => this.currentCwd);
   }
 
   async type(text: string, options: TypeOptions = {}) {
@@ -356,7 +368,9 @@ class NodePtyPaneSession implements PaneSession {
   }
 
   private handleMarker(marker: string) {
-    if (marker === this.promptMarker) {
+    const cwd = parsePromptCwdMarker(marker, this.promptMarker);
+    if (cwd !== null) {
+      this.currentCwd = cwd;
       if (this.hiddenOutputUntilPrompt > 0) {
         this.hiddenOutputUntilPrompt -= 1;
       }
@@ -439,7 +453,6 @@ class NodePtyPaneSession implements PaneSession {
 
   private waitForPromptMarker(timeoutMs = 2000) {
     const start = Date.now();
-    const marker = `\u001e${this.promptMarker}\u001e`;
 
     return new Promise<void>((resolve, reject) => {
       const tick = () => {
@@ -448,7 +461,9 @@ class NodePtyPaneSession implements PaneSession {
           return;
         }
 
-        if (this.dataBuffer.includes(marker)) {
+        const cwd = findPromptCwdMarker(this.dataBuffer, this.promptMarker);
+        if (cwd !== null) {
+          this.currentCwd = cwd;
           resolve();
           return;
         }
@@ -491,6 +506,35 @@ function shQuote(value: string) {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function findPromptCwdMarker(text: string, promptMarker: string) {
+  const markerPrefix = `\u001e${promptMarker}:`;
+  const markerStart = text.indexOf(markerPrefix);
+  if (markerStart === -1) {
+    return null;
+  }
+
+  const markerEnd = text.indexOf("\u001e", markerStart + markerPrefix.length);
+  if (markerEnd === -1) {
+    return null;
+  }
+
+  return parsePromptCwdMarker(text.slice(markerStart + 1, markerEnd), promptMarker);
+}
+
+function parsePromptCwdMarker(marker: string, promptMarker: string) {
+  const prefix = `${promptMarker}:`;
+  if (!marker.startsWith(prefix)) {
+    return null;
+  }
+
+  const encodedCwd = marker.slice(prefix.length);
+  if (encodedCwd === "") {
+    return null;
+  }
+
+  return Buffer.from(encodedCwd, "base64").toString("utf8");
 }
 
 function nextAlternateScreenState(current: boolean, text: string) {

@@ -67,6 +67,21 @@ export type ExecResult = {
  */
 export interface PaneController {
   /**
+   * Returns the latest current working directory observed for this pane.
+   *
+   * The value updates whenever the shell returns to a prompt, so it reflects completed
+   * `exec()` commands that changed directory. Long-running foreground processes and
+   * commands started with `sendLine()` may not update it until the prompt is shown again.
+   *
+   * @example
+   * ```ts
+   * await pane.exec("cd packages/termdem");
+   * console.log(await pane.cwd());
+   * ```
+   */
+  cwd(): Promise<string>;
+
+  /**
    * Types raw text into the terminal as visible keyboard input.
    *
    * Use this for interactive programs where the script should not submit a complete

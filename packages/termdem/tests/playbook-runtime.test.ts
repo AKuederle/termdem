@@ -87,6 +87,22 @@ test("playbook runtime retries waitFor probes and reports timeout labels", async
   ).rejects.toThrow('Timed out waiting for "never ready"');
 });
 
+test("playbook runtime exposes pane cwd after visible commands change it", async () => {
+  const runtime = new PlaybookRuntime({
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
+    typeDelayMs: 0,
+  });
+
+  await runtime.run(async (api) => {
+    const pane = api.pane("main");
+    const initialCwd = await pane.cwd();
+
+    await pane.exec("mkdir nested && cd nested");
+
+    expect(await pane.cwd()).toBe(join(initialCwd, "nested"));
+  });
+});
+
 test("playbook runtime runs hidden lifecycle hooks around the visible script", async () => {
   const states: string[] = [];
   const visibleOutput: string[] = [];
