@@ -95,6 +95,32 @@ test("pane sessions can type a command and press Enter against a real shell", as
   }
 });
 
+test("pane sessions can press key constants", async () => {
+  const cwd = await createTempDir();
+  const visibleOutput: string[] = [];
+  const session = await createPaneSession({
+    cwd,
+    onOutput(chunk) {
+      visibleOutput.push(chunk);
+    },
+  });
+
+  try {
+    await session.type("printf cancelled");
+    await session.press(keys.CTRL_C);
+
+    const result = await session.exec("printf after-cancel", { typeDelayMs: 0 });
+
+    expect(result.text).toBe("after-cancel");
+    const transcript = visibleOutput.join("");
+    expect(transcript).toContain("printf cancelled");
+    expect(transcript).toContain("after-cancel");
+    expect(transcript).not.toContain("cancelledafter-cancel");
+  } finally {
+    await session.close();
+  }
+});
+
 test("pane sessions fail fast for unsupported non-bash shells", async () => {
   await expect(
     createPaneSession({

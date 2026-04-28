@@ -163,12 +163,9 @@ class NodePtyPaneSession implements PaneSession {
 
   async press(key: PressKey) {
     await this.enqueue(async () => {
-      if (key !== "Enter" && key !== "\r") {
-        throw new Error("Unsupported key");
-      }
-
-      this.emitInputVisible("\r\n");
-      this.pty.write("\r");
+      const input = normalizePressKey(key);
+      this.emitInputVisible(input === "\r" ? "\r\n" : input);
+      this.pty.write(input);
     });
   }
 
@@ -199,12 +196,9 @@ class NodePtyPaneSession implements PaneSession {
 
   async pressHidden(key: PressKey) {
     await this.enqueue(async () => {
-      if (key !== "Enter" && key !== "\r") {
-        throw new Error("Unsupported key");
-      }
-
-      this.hideOutputUntilPrompt();
-      this.pty.write("\r");
+      const input = normalizePressKey(key);
+      this.hideOutputUntilPrompts(countPromptProducingControls(input));
+      this.pty.write(input);
     });
   }
 
@@ -568,6 +562,10 @@ function countPromptProducingControls(text: string) {
   }
 
   return count;
+}
+
+function normalizePressKey(key: PressKey) {
+  return key === "Enter" ? "\r" : key;
 }
 
 async function sleep(delayMs: number) {

@@ -1,9 +1,11 @@
+import type { KeySequence } from "./keys.ts";
+
 /**
  * Keys accepted by `pane.press()`.
  *
- * Use {@link keys.ENTER} or the literal string `"Enter"` for readability in demo scripts.
+ * Use constants from {@link keys}, or the literal string `"Enter"` for readability.
  */
-export type PressKey = "Enter" | "\r";
+export type PressKey = "Enter" | KeySequence;
 
 /**
  * Options for visible typed input.
@@ -100,14 +102,15 @@ export interface PaneController {
   type(text: string, options?: TypeOptions): Promise<void>;
 
   /**
-   * Presses a supported special key.
+   * Presses a single supported key or key combination.
    *
-   * @param key - The key to press. Use `"Enter"`, `"\r"`, or `keys.ENTER`.
+   * @param key - The key sequence to press. Use constants from `keys` for readability.
    *
    * @example
    * ```ts
    * await pane.type(":wq");
    * await pane.press(keys.ENTER);
+   * await pane.press(keys.ESC);
    * ```
    */
   press(key: PressKey): Promise<void>;

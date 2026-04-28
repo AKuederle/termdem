@@ -137,8 +137,8 @@ test("playbook runtime runs hidden lifecycle hooks around the visible script", a
           .type(
             "printf '(main) $ (main) $ hidden-prompt-string'\rprintf hidden-after-prompt-string\r",
           );
-        await api.pane("main").type(keys.CTRL_L);
-        await api.pane("main").type(keys.ESC);
+        await api.pane("main").press(keys.CTRL_L);
+        await api.pane("main").press(keys.ESC);
         await api.pane("main").press("Enter");
         return { message: result.text };
       },
