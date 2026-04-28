@@ -113,7 +113,6 @@ test("playbook runtime runs hidden lifecycle hooks around the visible script", a
         await api.pane("main").sendLine("printf hidden-sendline");
         await api.pane("main").type("printf hidden-type");
         await api.pane("main").press("Enter");
-        await api.wait(50);
         return { message: result.text };
       },
       teardown: async (api, setupData) => {

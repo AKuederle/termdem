@@ -314,18 +314,26 @@ export class PlaybookRuntime<Name extends string = string> {
       },
       press: async (key: PressKey): Promise<void> => {
         await this.ensureActive(generation, actionName("press"));
+        if (controllerOptions.hiddenPaneExec) {
+          await this.readyPane(name).pressHidden(key);
+          return;
+        }
         await this.readyPane(name).press(key);
       },
       sendLine: async (command: string, options?: TypeOptions): Promise<void> => {
         await this.ensureActive(generation, actionName("sendLine"));
         if (controllerOptions.hiddenPaneExec) {
-          await this.readyPane(name).execHidden(command);
+          await this.readyPane(name).sendLineHidden(command);
           return;
         }
         await this.readyPane(name).sendLine(command, withDefaultTypeDelay(options));
       },
       type: async (text: string, options?: TypeOptions): Promise<void> => {
         await this.ensureActive(generation, actionName("type"));
+        if (controllerOptions.hiddenPaneExec) {
+          await this.readyPane(name).typeHidden(text, withDefaultTypeDelay(options));
+          return;
+        }
         await this.readyPane(name).type(text, withDefaultTypeDelay(options));
       },
     };

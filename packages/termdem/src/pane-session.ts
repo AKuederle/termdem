@@ -17,7 +17,10 @@ export type PaneSessionOptions = {
 export interface PaneSession extends PaneController {
   close(): Promise<void>;
   execHidden(command: string): Promise<ExecResult>;
+  pressHidden(key: PressKey): Promise<void>;
   resize(cols: number, rows: number): Promise<void>;
+  sendLineHidden(command: string): Promise<void>;
+  typeHidden(text: string, options?: TypeOptions): Promise<void>;
 }
 
 type PendingExec = {
@@ -85,6 +88,7 @@ class NodePtyPaneSession implements PaneSession {
   private closed = false;
   private bootstrapping = true;
   private alternateScreenActive = false;
+  private hiddenOutputUntilPrompt = 0;
 
   constructor(pty: IPty, prompt: string, onOutput?: (chunk: string) => void) {
     this.pty = pty;
@@ -143,6 +147,21 @@ class NodePtyPaneSession implements PaneSession {
     });
   }
 
+  async typeHidden(text: string, options: TypeOptions = {}) {
+    await this.enqueue(() => this.performTypeHidden(text, options));
+  }
+
+  async pressHidden(key: PressKey) {
+    await this.enqueue(async () => {
+      if (key !== "Enter" && key !== "\r") {
+        throw new Error("Unsupported key");
+      }
+
+      this.hideOutputUntilPrompt();
+      this.pty.write("\r");
+    });
+  }
+
   async resize(cols: number, rows: number) {
     await this.enqueue(async () => {
       this.pty.resize(Math.max(20, Math.floor(cols)), Math.max(8, Math.floor(rows)));
@@ -154,6 +173,13 @@ class NodePtyPaneSession implements PaneSession {
       await this.performType(command, options);
       this.emitInputVisible("\r\n");
       this.pty.write("\r");
+    });
+  }
+
+  async sendLineHidden(command: string) {
+    await this.enqueue(async () => {
+      this.hideOutputUntilPrompt();
+      this.pty.write(`${command}\r`);
     });
   }
 
@@ -175,6 +201,13 @@ class NodePtyPaneSession implements PaneSession {
   private async performType(text: string, options: TypeOptions = {}) {
     for (const char of text) {
       this.emitInputVisible(char);
+      this.pty.write(char);
+      await sleep(options.typeDelayMs ?? typingDelays.WPM_60);
+    }
+  }
+
+  private async performTypeHidden(text: string, options: TypeOptions = {}) {
+    for (const char of text) {
       this.pty.write(char);
       await sleep(options.typeDelayMs ?? typingDelays.WPM_60);
     }
@@ -264,14 +297,24 @@ class NodePtyPaneSession implements PaneSession {
     }
 
     this.alternateScreenActive = nextAlternateScreenState(this.alternateScreenActive, text);
-    if (this.pendingExec?.visible !== false && this.completedExec?.visible !== false) {
+    const visibleText = stripVTControlCharacters(text);
+    const suppressHiddenPromptOutput = this.hiddenOutputUntilPrompt > 0;
+
+    if (
+      !suppressHiddenPromptOutput &&
+      this.pendingExec?.visible !== false &&
+      this.completedExec?.visible !== false
+    ) {
       this.emitVisible(text);
     }
     if (this.captureActive) {
       this.pendingExec?.rawChunks.push(text);
     }
 
-    const visibleText = stripVTControlCharacters(text);
+    if (suppressHiddenPromptOutput && visibleText.includes(this.prompt)) {
+      this.hiddenOutputUntilPrompt -= 1;
+    }
+
     if (this.completedExec && visibleText.includes(this.prompt)) {
       const completedExec = this.completedExec;
       clearTimeout(completedExec.timer);
@@ -353,6 +396,10 @@ class NodePtyPaneSession implements PaneSession {
 
       tick();
     });
+  }
+
+  private hideOutputUntilPrompt() {
+    this.hiddenOutputUntilPrompt += 1;
   }
 }
 
