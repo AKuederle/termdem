@@ -777,6 +777,14 @@ export const typingDelays = {
   WPM_120: 100,
 };
 
+export function typedString(text, options = {}) {
+  return {
+    kind: "termdem.typed-string",
+    options,
+    text,
+  };
+}
+
 export class Dir {
   constructor() {}
 }

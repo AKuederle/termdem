@@ -88,6 +88,7 @@ test("client shim exports browser-safe public demo helpers", () => {
   expect(source).toContain('ESC: "\\x1b"');
   expect(source).toContain("export const typingDelays");
   expect(source).toContain("WPM_120: 100");
+  expect(source).toContain("export function typedString");
   expect(source).toContain(
     "export function createTerminalDemo({ panes, script, settings = {}, setup, teardown })",
   );
