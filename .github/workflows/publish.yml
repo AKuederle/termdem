@@ -30,7 +30,7 @@ jobs:
           cache: true
 
       - name: Set up pnpm
-        run: npm install --global pnpm@10.33.1
+        run: npm install --global npm@latest pnpm@10.33.1
 
       - name: Check release tag matches package version
         run: |
@@ -46,4 +46,4 @@ jobs:
 
       - name: Publish package
         working-directory: packages/termdem
-        run: npm publish --access public --provenance
+        run: npm publish --access public
