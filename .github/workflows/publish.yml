@@ -28,7 +28,6 @@ jobs:
         with:
           node-version: "22"
           cache: true
-          registry-url: "https://registry.npmjs.org"
 
       - name: Check release tag matches package version
         run: |
@@ -57,5 +56,3 @@ jobs:
       - name: Publish package
         working-directory: packages/termdem
         run: pnpm publish --access public --provenance --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
