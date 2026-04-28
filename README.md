@@ -72,17 +72,101 @@ export function render(panes: TerminalPaneComponents<typeof demo>) {
 
 ### Highlight the active terminal
 
+Every pane component receives a `data-termdem-current` attribute while it is the pane currently controlled by the script. Use Tailwind's data selector variants to make that pane stand out without adding state to your render function.
+
+```tsx
+<panes.server className="transition data-[termdem-current]:ring-2 data-[termdem-current]:ring-cyan-300 data-[termdem-current]:brightness-110" />
+<panes.client className="transition data-[termdem-current]:ring-2 data-[termdem-current]:ring-cyan-300 data-[termdem-current]:brightness-110" />
+```
+
+### Configure working dirs
+
+Use `Dir` when the demo should run inside an existing directory, and `TmpDir` when the demo should get a fresh disposable workspace. Multiple panes can share the same workspace object; for most demos, prefer `TmpDir` and seed it in `setup` so every recording starts from a clean state.
+
+```ts
+const workspace = new TmpDir({
+  setup: async (path) => {
+    await fs.writeFile(`${path}/README.md`, "# Demo\n");
+  },
+});
+
+panes: [
+  { name: "server", pwd: workspace },
+  { name: "client", pwd: workspace },
+];
+```
+
 ### Run Setup and Teardown
 
-There are multiple levels of setup and teardown levels.
-The first one is for the working dir.
-Both `Dir` and `TmpDir` support `setup` and `teardown` funcs that allow to seed the dirs with certain files.
-Note, that for `TmpDir`, `teardown` is usually not required, as we just delete the dir after the run.
+Directory `setup` and `teardown` prepare files before panes start, while demo-level `setup` and `teardown` use the same API as `script` for hidden terminal and Node-side work. Demo-level commands are not displayed, run with instant typing by default, and `setup` can return data that is passed as the second `script` argument.
 
-The second level are the `setup` and `teardown` funcs that can be passed to `createTerminalDemo`.
-They work like the script callback and have access to the same functionality, with two distinctions.
-The commands are not displayed on the frontend and the default `typingDelay` is set to 0 ms/typing simulation for `exec` is turned off to speed up the execution.
-The setup func can return a data object that will be provided as a second argument to the `script`.
+```ts
+export const demo = createTerminalDemo({
+  setup: async (api) => {
+    const result = await api.pane("main").exec("node scripts/prepare.mjs");
+    return { token: result.text };
+  },
+  script: async (api, setupData) => {
+    await api.pane("main").exec(`node cli.mjs login ${quoteShellArg(setupData.token)}`);
+  },
+  teardown: async (api) => {
+    await api.node.execFile("node", ["scripts/cleanup.mjs"], { reject: false });
+  },
+});
+```
+
+### Full-screen Terminal Apps
+
+For editors and other full-screen terminal apps, start the process with `sendLine()` so the script can keep sending keystrokes while the app remains open. Use `type()` for raw input, `press(keys.ENTER)` for supported special keys, and short `wait()` calls when the app needs a moment to redraw.
+
+```ts
+await pane.sendLine("vim README.md");
+await api.wait(300);
+await pane.type("i# Demo notes\n");
+await pane.type(keys.ESC);
+await pane.type(":wq");
+await pane.press(keys.ENTER);
+```
+
+### Typing speed
+
+Typing speed is controlled by `typeDelayMs`, either globally in `settings` or per command/input call. Setup and teardown default to instant input, but visible interactive apps sometimes need a small delay because terminals can drop or reorder keypresses that arrive too quickly.
+
+```ts
+settings: {
+  typeDelayMs: typingDelays.WPM_120,
+},
+
+await pane.exec("npm test", { typeDelayMs: 0 });
+await pane.type("iTyped into Vim\n", { typeDelayMs: typingDelays.WPM_180 });
+```
+
+### Parsing command outputs
+
+`pane.exec()` waits for the command to finish and returns cleaned output. Use `text` for the full stripped output, or `lines` when you need to pick a value for a later command.
+
+```ts
+const result = await api.pane("server").exec("node scripts/server.mjs setup");
+const url = result.lines.find((line) => line.startsWith("CHAT_URL="))?.slice("CHAT_URL=".length);
+
+await api.pane("client").exec(`node client.mjs ${quoteShellArg(url)}`);
+```
+
+### "Hidden" Commands
+
+Use normal JavaScript inside `script`, `setup`, and `teardown` for values that do not need a shell, and use `api.node.execFile()` for hidden subprocesses. This pairs well with `api.waitFor()` when a visible pane starts a server and the script needs to wait until it is ready.
+
+```ts
+await api.pane("server").sendLine("npm run dev");
+await api.waitFor("server ready", async () => {
+  const result = await api.node.execFile("curl", ["-fsS", "http://127.0.0.1:5173"], {
+    reject: false,
+    timeoutMs: 1000,
+  });
+
+  return result.exitCode === 0;
+});
+```
 
 ## How it works
 
