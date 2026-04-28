@@ -54,7 +54,7 @@ test("node exec captures stdout, stderr, exit code, timeout, and reject behavior
   });
   let rejectionMessage = "";
   let result: NodeExecResult | undefined;
-  let timeoutExitCode: number | undefined;
+  let timeoutResult: NodeExecResult | undefined;
 
   await runtime.run(async (api) => {
     try {
@@ -68,17 +68,17 @@ test("node exec captures stdout, stderr, exit code, timeout, and reject behavior
       reject: false,
     });
 
-    const timeout = await api.node.exec(process.execPath, [scriptPath, "0"], {
+    timeoutResult = await api.node.exec(process.execPath, [scriptPath, "0"], {
       cwd,
       reject: false,
       timeoutMs: 1,
     });
-    timeoutExitCode = timeout.exitCode;
   });
 
   expect(rejectionMessage).toContain("exited with code 7");
   expect(result).toEqual({ exitCode: 7, stderr: "err", stdout: "out" });
-  expect(timeoutExitCode).not.toBe(0);
+  expect(timeoutResult).toBeDefined();
+  expect(timeoutResult?.exitCode).not.toBe(0);
 });
 
 test("playbook runtime retries waitFor probes and reports timeout labels", async () => {
