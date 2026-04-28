@@ -29,6 +29,7 @@ export const demo = createTerminalDemo({
     const listener = api.pane("listener");
     const sender = api.pane("sender");
 
+    await api.wait(500);
     const setup = await server.exec("node scripts/server.mjs setup");
     const url = parseChatUrl(setup.text);
 
@@ -55,10 +56,10 @@ export const demo = createTerminalDemo({
       reject: false,
       timeoutMs: 1_000,
     });
+    await api.wait(800);
   },
   settings: {
-    oversample: 1.5,
-    size: { width: 1280, height: 720 },
+    size: { width: 1920, height: 1080 },
     typeDelayMs: typingDelays.WPM_MAX,
   },
 });

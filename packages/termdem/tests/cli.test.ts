@@ -30,29 +30,6 @@ test("parseTermdemCliArgs parses record commands and infers webm output", () => 
   });
 });
 
-test("parseTermdemCliArgs supports recording oversample", () => {
-  expect(
-    parseTermdemCliArgs([
-      "record",
-      "demo.tsx",
-      "demo.mp4",
-      "--size",
-      "1920x1080",
-      "--oversample",
-      "2",
-    ]),
-  ).toEqual({
-    cliOptions: {
-      oversample: "2",
-      size: "1920x1080",
-    },
-    command: "record",
-    demoPath: "demo.tsx",
-    format: "mp4",
-    outputPath: "demo.mp4",
-  });
-});
-
 test("parseTermdemCliArgs rejects unknown commands and malformed record commands", () => {
   expect(() => parseTermdemCliArgs(["capture", "demo.tsx"])).toThrow('Unknown command "capture"');
   expect(() => parseTermdemCliArgs(["record", "demo.tsx"])).toThrow("Usage: termdem record");
@@ -105,7 +82,6 @@ test("runRecordCommand records the headless preview and closes the server", asyn
   await runRecordCommand(
     {
       cliOptions: {
-        oversample: "2",
         size: "1920x1080",
       },
       command: "record",
@@ -116,7 +92,7 @@ test("runRecordCommand records the headless preview and closes the server", asyn
     {
       async recordBrowserPage(options) {
         events.push(
-          `record:${options.url}:${options.outputPath}:${options.size.width}x${options.size.height}:${options.viewportSize.width}x${options.viewportSize.height}`,
+          `record:${options.url}:${options.outputPath}:${options.size.width}x${options.size.height}`,
         );
       },
       async startPreviewServer(options) {
@@ -140,7 +116,7 @@ test("runRecordCommand records the headless preview and closes the server", asyn
 
   expect(events).toEqual([
     "preview:demo.tsx:false",
-    "record:http://127.0.0.1:5173/:demo.webm:3840x2160:1920x1080",
+    "record:http://127.0.0.1:5173/:demo.webm:1920x1080",
     "close",
   ]);
 });

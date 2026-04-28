@@ -348,44 +348,12 @@ test("resolveRecordingConfig uses CLI size for viewport and recording by default
     resolveRecordingConfig({ size: { width: 1280, height: 720 } }, { size: "1920x1080" }),
   ).toEqual({
     size: { width: 1920, height: 1080 },
-    viewportSize: { width: 1920, height: 1080 },
-  });
-});
-
-test("resolveRecordingConfig oversamples recording output from viewport size", () => {
-  expect(
-    resolveRecordingConfig(
-      {
-        size: { width: 1920, height: 1080 },
-        oversample: 1.5,
-      },
-      {
-        size: "1440x1080",
-        oversample: "2",
-      },
-    ),
-  ).toEqual({
-    size: { width: 2880, height: 2160 },
-    viewportSize: { width: 1440, height: 1080 },
-  });
-});
-
-test("resolveRecordingConfig uses demo oversample when CLI does not override it", () => {
-  expect(
-    resolveRecordingConfig({
-      oversample: 2,
-      size: { width: 1280, height: 720 },
-    }),
-  ).toEqual({
-    viewportSize: { width: 1280, height: 720 },
-    size: { width: 2560, height: 1440 },
   });
 });
 
 test("resolveRecordingConfig falls back to demo size", () => {
   expect(resolveRecordingConfig({ size: { width: 1024, height: 768 } })).toEqual({
     size: { width: 1024, height: 768 },
-    viewportSize: { width: 1024, height: 768 },
   });
 });
 
@@ -393,7 +361,6 @@ test("resolveRecordingConfig rejects invalid size flags", () => {
   expect(() => resolveRecordingConfig({}, { size: "1920-1080" })).toThrow(
     'Invalid size "1920-1080"',
   );
-  expect(() => resolveRecordingConfig({}, { oversample: "0" })).toThrow('Invalid oversample "0"');
 });
 
 test("TmpDir instances can be shared by multiple terminal workspaces", async () => {

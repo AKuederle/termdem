@@ -22,6 +22,7 @@ export const demo = createTerminalDemo({
   script: async (api) => {
     const git = api.pane("git");
 
+    await api.wait(500);
     await git.exec("git init");
     await git.exec("git config user.name 'termdem' && git config user.email 'demo@example.test'");
 
@@ -46,6 +47,7 @@ export const demo = createTerminalDemo({
     await git.exec("git add README.md");
     await git.exec("git commit -m 'Create README through vim'");
     await git.exec("git log --oneline --decorate --stat -1");
+    await api.wait(800);
   },
   setup: async (api) => {
     // Keep the recording focused on `vim README.md`, while making Vim deterministic:

@@ -13,7 +13,6 @@ export type BrowserRecordingOptions = {
   outputPath: string;
   size: DemoSize;
   url: string;
-  viewportSize: DemoSize;
   waitForDone?: (page: Page) => Promise<void>;
 };
 
@@ -33,29 +32,27 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
       headless: true,
     });
     const context = await browser.newContext({
-      recordVideo: {
-        dir: tempDir,
-        size: options.size,
-      },
-      viewport: options.viewportSize,
+      viewport: options.size,
     });
     const page = await context.newPage();
     options.onProgress?.("Loading preview");
     await page.goto(recordingUrl(options.url));
 
-    const video = page.video();
-    if (!video) {
-      throw new Error("Playwright did not create a video for the recording page.");
-    }
-
     options.onProgress?.("Waiting for terminal panes");
     await waitForRecordingReady(page);
+    options.onProgress?.("Starting browser recording");
+    await page.screencast.start({
+      path: rawVideoPath,
+      size: options.size,
+    });
     options.onProgress?.("Running demo script");
-    await startRecordingDemo(page);
-    await waitForRecordingDone(page, options);
-    options.onProgress?.("Saving raw browser recording");
-    await context.close();
-    await video.saveAs(rawVideoPath);
+    try {
+      await startRecordingDemo(page);
+      await waitForRecordingDone(page, options);
+    } finally {
+      options.onProgress?.("Stopping browser recording");
+      await page.screencast.stop();
+    }
 
     if (
       videoNeedsTranscode({

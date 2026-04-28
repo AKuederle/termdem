@@ -46,7 +46,6 @@ export type RecordCommandDependencies = {
     outputPath: string;
     size: ResolvedRecordingConfig["size"];
     url: string;
-    viewportSize: ResolvedRecordingConfig["viewportSize"];
   }) => Promise<void> | void;
   startPreviewServer: (options: {
     demoPath: string;
@@ -131,7 +130,6 @@ export async function runRecordCommand(
       outputPath: command.outputPath,
       size: recordingConfig.size,
       url,
-      viewportSize: recordingConfig.viewportSize,
     });
   } finally {
     await previewServer.close();
@@ -162,12 +160,6 @@ function parseRecordArgs(args: readonly string[]): RecordCommand {
       continue;
     }
 
-    if (arg === "--oversample") {
-      cliOptions.oversample = readFlagValue(args, index, arg);
-      index += 1;
-      continue;
-    }
-
     if (arg.startsWith("-")) {
       throw new Error(`Unknown record option "${arg}".`);
     }
@@ -177,7 +169,7 @@ function parseRecordArgs(args: readonly string[]): RecordCommand {
 
   if (positional.length !== 2) {
     throw new Error(
-      "Usage: termdem record <demo.tsx> <output.{webm|mp4}> [--size <width>x<height>] [--oversample <factor>]",
+      "Usage: termdem record <demo.tsx> <output.{webm|mp4}> [--size <width>x<height>]",
     );
   }
 
@@ -203,7 +195,7 @@ function readFlagValue(args: readonly string[], index: number, flag: string) {
 function helpText() {
   return `Usage:
   termdem preview <demo.tsx>
-  termdem record <demo.tsx> <output.{webm|mp4}> [--size <width>x<height>] [--oversample <factor>]
+  termdem record <demo.tsx> <output.{webm|mp4}> [--size <width>x<height>]
 `;
 }
 
