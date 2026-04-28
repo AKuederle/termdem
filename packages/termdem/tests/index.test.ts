@@ -274,6 +274,53 @@ test("pane sessions execute composed typed command text", async () => {
   }
 });
 
+test("pane sessions type composed text into interactive input", async () => {
+  const visibleOutput: string[] = [];
+  const session = await createPaneSession({
+    onOutput(chunk) {
+      visibleOutput.push(chunk);
+    },
+  });
+
+  try {
+    await session.type(["printf ", typedString("'typed'", { typeDelayMs: 0 })], {
+      typeDelayMs: 25,
+    });
+    await session.press("Enter");
+
+    await waitFor(() => visibleOutput.join("").includes("typed"));
+
+    const transcript = visibleOutput.join("");
+    expect(transcript).toContain("printf 'typed'");
+    expect(transcript).toContain("typed");
+  } finally {
+    await session.close();
+  }
+});
+
+test("pane sessions send composed command lines", async () => {
+  const visibleOutput: string[] = [];
+  const session = await createPaneSession({
+    onOutput(chunk) {
+      visibleOutput.push(chunk);
+    },
+  });
+
+  try {
+    await session.sendLine(["printf ", typedString("'sent'", { typeDelayMs: 0 })], {
+      typeDelayMs: 25,
+    });
+
+    await waitFor(() => visibleOutput.join("").includes("sent"));
+
+    const transcript = visibleOutput.join("");
+    expect(transcript).toContain("printf 'sent'");
+    expect(transcript).toContain("sent");
+  } finally {
+    await session.close();
+  }
+});
+
 test("pane sessions reject pending exec work when closed", async () => {
   const session = await createPaneSession();
   const pendingExec = session.exec("sleep 30", { typeDelayMs: 0 });

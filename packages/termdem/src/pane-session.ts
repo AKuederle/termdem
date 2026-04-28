@@ -20,8 +20,8 @@ export interface PaneSession extends PaneController {
   execHidden(command: string): Promise<ExecResult>;
   pressHidden(key: PressKey): Promise<void>;
   resize(cols: number, rows: number): Promise<void>;
-  sendLineHidden(command: string): Promise<void>;
-  typeHidden(text: string, options?: TypeOptions): Promise<void>;
+  sendLineHidden(command: TypableText): Promise<void>;
+  typeHidden(text: TypableText, options?: TypeOptions): Promise<void>;
 }
 
 type PendingExec = {
@@ -172,7 +172,7 @@ class NodePtyPaneSession implements PaneSession {
     });
   }
 
-  async type(text: string, options: PaneSessionTypeOptions = {}) {
+  async type(text: TypableText, options: PaneSessionTypeOptions = {}) {
     await this.enqueue(() => this.performType(text, options));
   }
 
@@ -210,7 +210,7 @@ class NodePtyPaneSession implements PaneSession {
     });
   }
 
-  async typeHidden(text: string, options: PaneSessionTypeOptions = {}) {
+  async typeHidden(text: TypableText, options: PaneSessionTypeOptions = {}) {
     await this.enqueue(() => this.performTypeHidden(text, options));
   }
 
@@ -228,7 +228,7 @@ class NodePtyPaneSession implements PaneSession {
     });
   }
 
-  async sendLine(command: string, options: PaneSessionTypeOptions = {}) {
+  async sendLine(command: TypableText, options: PaneSessionTypeOptions = {}) {
     await this.enqueue(async () => {
       await this.performType(command, options);
       await options.waitForActive?.();
@@ -237,10 +237,10 @@ class NodePtyPaneSession implements PaneSession {
     });
   }
 
-  async sendLineHidden(command: string) {
+  async sendLineHidden(command: TypableText) {
     await this.enqueue(async () => {
       this.hideOutputUntilPrompt();
-      this.pty.write(`${command}\r`);
+      this.pty.write(`${typableTextValue(command)}\r`);
     });
   }
 
@@ -270,13 +270,15 @@ class NodePtyPaneSession implements PaneSession {
     }
   }
 
-  private async performTypeHidden(text: string, options: PaneSessionTypeOptions = {}) {
-    this.hideOutputUntilPrompts(countPromptProducingControls(text));
+  private async performTypeHidden(text: TypableText, options: PaneSessionTypeOptions = {}) {
+    this.hideOutputUntilPrompts(countPromptProducingControls(typableTextValue(text)));
 
-    for (const char of text) {
-      await options.waitForActive?.();
-      this.pty.write(char);
-      await sleep(options.typeDelayMs ?? typingDelays.WPM_60);
+    for (const segment of normalizeTypableText(text)) {
+      for (const char of segment.text) {
+        await options.waitForActive?.();
+        this.pty.write(char);
+        await sleep(segment.typeDelayMs ?? options.typeDelayMs ?? typingDelays.WPM_60);
+      }
     }
   }
 

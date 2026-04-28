@@ -112,7 +112,7 @@ export interface PaneController {
    * await pane.type(keys.ESC);
    * ```
    */
-  type(text: string, options?: TypeOptions): Promise<void>;
+  type(text: TypableText, options?: TypeOptions): Promise<void>;
 
   /**
    * Presses a single supported key or key combination.
@@ -163,7 +163,7 @@ export interface PaneController {
    * await clientPane.exec("curl http://localhost:5173");
    * ```
    */
-  sendLine(command: string, options?: TypeOptions): Promise<void>;
+  sendLine(command: TypableText, options?: TypeOptions): Promise<void>;
 }
 
 /**
