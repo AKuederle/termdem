@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -8,7 +8,12 @@ import react from "@vitejs/plugin-react";
 import { createServer, type Alias, type Plugin, type ViteDevServer } from "vite";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 import { PlaybookRuntime } from "./playbook-runtime.ts";
-import { parseBrowserToServerMessage, type ServerToBrowserMessage } from "./protocol.ts";
+import {
+  parseBrowserToServerMessage,
+  type PaneScreenResponseMessage,
+  type PaneScreenSnapshot,
+  type ServerToBrowserMessage,
+} from "./protocol.ts";
 import type { TerminalDemo } from "./terminal-demo.ts";
 import type { TerminalWorkspaceDefinition } from "./workspace.ts";
 
@@ -28,6 +33,59 @@ export type TermdemPreviewServer = {
 type PreviewDemoModule = Partial<TerminalDemo<readonly TerminalWorkspaceDefinition[]>>;
 
 const bridgeToken = randomBytes(24).toString("hex");
+const socketOpenState = 1;
+
+type PreviewSendSocket = Pick<WebSocket, "readyState" | "send">;
+
+type PaneScreenRequestBrokerOptions = {
+  timeoutMs?: number;
+};
+
+export function createPaneScreenRequestBroker(options: PaneScreenRequestBrokerOptions = {}) {
+  const timeoutMs = options.timeoutMs ?? 1_000;
+  const pending = new Map<
+    string,
+    {
+      pane: string;
+      reject: (error: Error) => void;
+      resolve: (snapshot: PaneScreenSnapshot) => void;
+      timer: ReturnType<typeof setTimeout>;
+    }
+  >();
+
+  return {
+    request(pane: string, clients: Set<PreviewSendSocket>): Promise<PaneScreenSnapshot> {
+      const openClients = [...clients].filter((client) => client.readyState === socketOpenState);
+      if (openClients.length === 0) {
+        return Promise.reject(new Error("Pane screen reads require an open preview client"));
+      }
+
+      const requestId = randomUUID();
+      const message = JSON.stringify({ type: "pane.screen.request", pane, requestId });
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          pending.delete(requestId);
+          reject(new Error(`Timed out reading screen for pane "${pane}"`));
+        }, timeoutMs);
+        pending.set(requestId, { pane, reject, resolve, timer });
+
+        for (const client of openClients) {
+          client.send(message);
+        }
+      });
+    },
+    resolve(message: PaneScreenResponseMessage) {
+      const request = pending.get(message.requestId);
+      if (!request || request.pane !== message.pane) {
+        return;
+      }
+
+      clearTimeout(request.timer);
+      pending.delete(message.requestId);
+      request.resolve(message.snapshot);
+    },
+  };
+}
 
 export async function runPreviewCommand(options: PreviewServerOptions) {
   const server = await startPreviewServer(options);
@@ -149,6 +207,7 @@ function ptyBridge({ demoPath }: { demoPath: string }): Plugin {
   const clients = new Set<WebSocket>();
   const latestMessages = new Map<string, ServerToBrowserMessage>();
   const paneOutputBuffers = new Map<string, string>();
+  const paneScreenRequests = createPaneScreenRequestBroker();
 
   const broadcast = (message: ServerToBrowserMessage) => {
     rememberPaneOutput(paneOutputBuffers, message);
@@ -189,6 +248,7 @@ function ptyBridge({ demoPath }: { demoPath: string }): Plugin {
             getRuntime: () => runtime,
             latestMessages,
             paneOutputBuffers,
+            paneScreenRequests,
             saveRuntime(nextRuntime) {
               runtime = nextRuntime;
             },
@@ -225,6 +285,7 @@ async function wirePreviewClient({
   getRuntime,
   latestMessages,
   paneOutputBuffers,
+  paneScreenRequests,
   saveRuntime,
   viteServer,
   ws,
@@ -235,6 +296,7 @@ async function wirePreviewClient({
   getRuntime: () => PlaybookRuntime | null;
   latestMessages: Map<string, ServerToBrowserMessage>;
   paneOutputBuffers: Map<string, string>;
+  paneScreenRequests: ReturnType<typeof createPaneScreenRequestBroker>;
   saveRuntime: (runtime: PlaybookRuntime) => void;
   viteServer: ViteDevServer;
   ws: WebSocket;
@@ -276,6 +338,9 @@ async function wirePreviewClient({
         onRecordingState(state) {
           broadcast({ type: "recording.state", ...state });
         },
+        readPaneScreen(pane) {
+          return paneScreenRequests.request(pane, clients);
+        },
         terminalDefinitions: demo.panes ?? [],
         typeDelayMs: demo.settings?.typeDelayMs,
       });
@@ -303,6 +368,7 @@ async function wirePreviewClient({
           demo,
           latestMessages,
           paneOutputBuffers,
+          paneScreenRequests,
           rawMessage: rawDataToString(message),
           runtime,
         }),
@@ -322,6 +388,7 @@ async function handleBrowserMessage({
   demo,
   latestMessages,
   paneOutputBuffers,
+  paneScreenRequests,
   rawMessage,
   runtime,
 }: {
@@ -329,6 +396,7 @@ async function handleBrowserMessage({
   demo: PreviewDemoModule;
   latestMessages: Map<string, ServerToBrowserMessage>;
   paneOutputBuffers: Map<string, string>;
+  paneScreenRequests: ReturnType<typeof createPaneScreenRequestBroker>;
   rawMessage: string;
   runtime: PlaybookRuntime;
 }) {
@@ -345,6 +413,7 @@ async function handleBrowserMessage({
       await runtime.resizePane(parsed.pane, parsed.cols, parsed.rows);
       return;
     case "pane.screen.response":
+      paneScreenRequests.resolve(parsed);
       return;
     case "playbook.start":
       if (demo.script) {

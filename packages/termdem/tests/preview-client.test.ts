@@ -7,6 +7,7 @@ import {
   previewPaneHeaderStyle,
   previewFrameSize,
   previewZoomStyle,
+  readWtermScreen,
 } from "../src/preview-client.tsx";
 import { queueOrSendPreviewMessage } from "../src/preview-socket.ts";
 
@@ -51,6 +52,48 @@ test("preview pane header style scales with terminal zoom", () => {
   expect(previewPaneHeaderStyle({})).toEqual({
     fontSize: "11px",
     height: "24px",
+  });
+});
+
+test("readWtermScreen extracts current terminal grid text from a wterm bridge", () => {
+  const cells = [
+    ["r", "e", "a", "d", "y"],
+    ["o", "k", "", "", ""],
+  ];
+
+  expect(
+    readWtermScreen({
+      bridge: {
+        getCell(row: number, col: number) {
+          return { bg: 256, char: cells[row]?.[col]?.codePointAt(0) ?? 0, fg: 256, flags: 0 };
+        },
+        getCols: () => 5,
+        getCursor: () => ({ col: 2, row: 1, visible: true }),
+        getRows: () => 2,
+        getScrollbackCount: () => 4,
+        usingAltScreen: () => false,
+      },
+    }),
+  ).toEqual({
+    altScreen: false,
+    cols: 5,
+    cursor: { col: 2, row: 1, visible: true },
+    lines: ["ready", "ok"],
+    rows: 2,
+    scrollbackCount: 4,
+    text: "ready\nok",
+  });
+});
+
+test("readWtermScreen returns empty snapshots before the terminal bridge is ready", () => {
+  expect(readWtermScreen(null)).toEqual({
+    altScreen: false,
+    cols: 0,
+    cursor: { col: 0, row: 0, visible: false },
+    lines: [],
+    rows: 0,
+    scrollbackCount: 0,
+    text: "",
   });
 });
 

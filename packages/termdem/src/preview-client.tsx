@@ -16,6 +16,7 @@ import "@wterm/react/css";
 import {
   parseServerToBrowserMessage,
   type BrowserToServerMessage,
+  type PaneScreenSnapshot,
   type ServerToBrowserMessage,
 } from "./protocol.ts";
 import { flushQueuedPreviewMessages, queueOrSendPreviewMessage } from "./preview-socket.ts";
@@ -31,6 +32,17 @@ type PreviewDemoModule = {
 type PreviewSocketContextValue = {
   addPaneListener(name: string, listener: (message: ServerToBrowserMessage) => void): () => void;
   send(message: BrowserToServerMessage): void;
+};
+
+type WtermScreenReadable = {
+  bridge: {
+    getCell(row: number, col: number): { char: number };
+    getCols(): number;
+    getCursor(): { col: number; row: number; visible: boolean };
+    getRows(): number;
+    getScrollbackCount(): number;
+    usingAltScreen(): boolean;
+  } | null;
 };
 
 type SocketStatus = "connecting" | "open" | "closed" | "error";
@@ -412,6 +424,46 @@ export function previewPaneHeaderStyle(config: RecordingConfig): CSSProperties {
   };
 }
 
+export function readWtermScreen(wterm: WtermScreenReadable | null): PaneScreenSnapshot {
+  const bridge = wterm?.bridge;
+  if (!bridge) {
+    return {
+      altScreen: false,
+      cols: 0,
+      cursor: { col: 0, row: 0, visible: false },
+      lines: [],
+      rows: 0,
+      scrollbackCount: 0,
+      text: "",
+    };
+  }
+
+  const cols = bridge.getCols();
+  const rows = bridge.getRows();
+  const lines: string[] = [];
+
+  for (let row = 0; row < rows; row++) {
+    let line = "";
+
+    for (let col = 0; col < cols; col++) {
+      const cell = bridge.getCell(row, col);
+      line += cell.char >= 32 ? String.fromCodePoint(cell.char) : " ";
+    }
+
+    lines.push(line.trimEnd());
+  }
+
+  return {
+    altScreen: bridge.usingAltScreen(),
+    cols,
+    cursor: bridge.getCursor(),
+    lines,
+    rows,
+    scrollbackCount: bridge.getScrollbackCount(),
+    text: lines.join("\n").trimEnd(),
+  };
+}
+
 function PaneTerminalCard({
   className,
   name,
@@ -436,6 +488,14 @@ function PaneTerminalCard({
         return;
       case "pane.output":
         write(message.data);
+        return;
+      case "pane.screen.request":
+        previewSocket.send({
+          type: "pane.screen.response",
+          pane: name,
+          requestId: message.requestId,
+          snapshot: readWtermScreen(ref.current?.instance ?? null),
+        });
         return;
       case "pane.status":
         setStatus(message.status);
