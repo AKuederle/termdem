@@ -25,7 +25,8 @@
     "termdem": "dist/cli.mjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "type": "module",
   "types": "./dist/index.d.mts",
@@ -60,7 +61,7 @@
     "dev": "vp pack --watch",
     "test": "vp test run --tagsFilter '!smoke'",
     "check": "vp check",
-    "prepack": "cp ../../README.md README.md && cp ../../LICENSE LICENSE",
+    "prepack": "cp ../../README.md README.md && cp ../../LICENSE LICENSE && cp ../../CHANGELOG.md CHANGELOG.md",
     "prepublishOnly": "vp run build"
   },
   "dependencies": {

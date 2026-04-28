@@ -1,0 +1,60 @@
+name: Publish
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install native build dependencies
+        run: apt-get update && apt-get install -y build-essential
+
+      - name: Set up Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "22"
+          cache: true
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Check release tag matches package version
+        run: |
+          VERSION="$(node -p "require('./packages/termdem/package.json').version")"
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "Release tag $GITHUB_REF_NAME does not match package version $VERSION"
+            exit 1
+          fi
+
+      - name: Build package for example typechecking
+        run: vp run @akuederle/termdem#build
+
+      - name: Check
+        run: vp check
+
+      - name: Test
+        run: vp run -r test
+
+      - name: Build
+        run: vp run -r build
+
+      - name: Smoke test examples
+        run: vp run test:smoke
+
+      - name: Publish package
+        run: pnpm -C packages/termdem publish --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
