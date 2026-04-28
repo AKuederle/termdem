@@ -107,6 +107,31 @@ test("playbook runtime cancellation prevents stale playbook completion", async (
   expect(states).not.toContain("done");
 });
 
+test("playbook runtime ignores overlapping start requests", async () => {
+  const runtime = new PlaybookRuntime({
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir() }],
+    typeDelayMs: 0,
+  });
+  let starts = 0;
+  let release!: () => void;
+  const started = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const first = runtime.run(async () => {
+    starts += 1;
+    await started;
+  });
+  const second = runtime.run(async () => {
+    starts += 1;
+  });
+
+  release();
+  await Promise.all([first, second]);
+
+  expect(starts).toBe(1);
+});
+
 async function createTempDir() {
   const path = await mkdtemp(join(tmpdir(), "termdem-runtime-test-"));
   cleanupPaths.push(path);

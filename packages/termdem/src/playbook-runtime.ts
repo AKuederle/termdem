@@ -57,6 +57,7 @@ type ManagedPane = {
 export class PlaybookRuntime<Name extends string = string> {
   private readonly options: PlaybookRuntimeOptions;
   private readonly panes = new Map<string, ManagedPane>();
+  private activeRun: Promise<void> | null = null;
   private generation = 0;
   private closed = false;
 
@@ -94,32 +95,23 @@ export class PlaybookRuntime<Name extends string = string> {
   }
 
   async run(script: (api: TerminalDemoScriptApi<Name>) => Promise<void> | void) {
-    const generation = ++this.generation;
-    await this.ensureReady();
-    this.publishPlaybookState({ state: "running" });
-    this.options.onRecordingState?.({ state: "started" });
-
-    try {
-      await script(this.createApi(generation));
-      if (this.isCurrent(generation)) {
-        this.publishPlaybookState({ state: "done" });
-        this.options.onRecordingState?.({ state: "done" });
-      }
-    } catch (error) {
-      if (!this.isCurrent(generation) && formatError(error) === "Playbook stopped") {
-        return;
-      }
-
-      if (this.isCurrent(generation)) {
-        const message = formatError(error);
-        this.publishPlaybookState({ state: "error", error: message });
-        this.options.onRecordingState?.({ state: "error", error: message });
-      }
+    if (this.activeRun) {
+      return this.activeRun;
     }
+
+    const run = this.runScript(script);
+    this.activeRun = run;
+    void run.finally(() => {
+      if (this.activeRun === run) {
+        this.activeRun = null;
+      }
+    });
+    return run;
   }
 
   stop() {
     this.generation += 1;
+    this.activeRun = null;
     this.publishPlaybookState({ state: "stopped" });
   }
 
@@ -187,6 +179,31 @@ export class PlaybookRuntime<Name extends string = string> {
       },
       waitFor: (label, probe, options) => this.waitFor(label, probe, options, generation),
     };
+  }
+
+  private async runScript(script: (api: TerminalDemoScriptApi<Name>) => Promise<void> | void) {
+    const generation = ++this.generation;
+    await this.ensureReady();
+    this.publishPlaybookState({ state: "running" });
+    this.options.onRecordingState?.({ state: "started" });
+
+    try {
+      await script(this.createApi(generation));
+      if (this.isCurrent(generation)) {
+        this.publishPlaybookState({ state: "done" });
+        this.options.onRecordingState?.({ state: "done" });
+      }
+    } catch (error) {
+      if (!this.isCurrent(generation) && formatError(error) === "Playbook stopped") {
+        return;
+      }
+
+      if (this.isCurrent(generation)) {
+        const message = formatError(error);
+        this.publishPlaybookState({ state: "error", error: message });
+        this.options.onRecordingState?.({ state: "error", error: message });
+      }
+    }
   }
 
   private createPaneController(name: string, generation: number): PaneController {

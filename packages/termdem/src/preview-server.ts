@@ -251,7 +251,7 @@ async function wirePreviewClient({
     clients.delete(ws);
   });
 
-  try {
+  const runtimeReady = (async () => {
     const demo = await loadDemoModule(viteServer, demoPath);
     let activeRuntime = getRuntime();
     if (!activeRuntime) {
@@ -282,9 +282,17 @@ async function wirePreviewClient({
       sendPreviewMessage(ws, message);
     }
 
-    ws.on("message", (message) => {
-      void handleBrowserMessage(demo, activeRuntime, rawDataToString(message)).catch(fail);
-    });
+    return { demo, runtime: activeRuntime };
+  })();
+
+  ws.on("message", (message) => {
+    void runtimeReady
+      .then(({ demo, runtime }) => handleBrowserMessage(demo, runtime, rawDataToString(message)))
+      .catch(fail);
+  });
+
+  try {
+    await runtimeReady;
   } catch (error) {
     await fail(error);
   }
