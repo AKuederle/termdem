@@ -207,9 +207,7 @@ class NodePtyPaneSession implements PaneSession {
   }
 
   private async performTypeHidden(text: string, options: TypeOptions = {}) {
-    if (submitsOrRepaintsPrompt(text)) {
-      this.hideOutputUntilPrompt();
-    }
+    this.hideOutputUntilPrompts(countPromptProducingControls(text));
 
     for (const char of text) {
       this.pty.write(char);
@@ -315,8 +313,11 @@ class NodePtyPaneSession implements PaneSession {
       this.pendingExec?.rawChunks.push(text);
     }
 
-    if (suppressHiddenPromptOutput && visibleText.includes(this.prompt)) {
-      this.hiddenOutputUntilPrompt -= 1;
+    if (suppressHiddenPromptOutput) {
+      this.hiddenOutputUntilPrompt = Math.max(
+        0,
+        this.hiddenOutputUntilPrompt - countOccurrences(visibleText, this.prompt),
+      );
     }
 
     if (this.completedExec && visibleText.includes(this.prompt)) {
@@ -403,7 +404,11 @@ class NodePtyPaneSession implements PaneSession {
   }
 
   private hideOutputUntilPrompt() {
-    this.hiddenOutputUntilPrompt += 1;
+    this.hideOutputUntilPrompts(1);
+  }
+
+  private hideOutputUntilPrompts(count: number) {
+    this.hiddenOutputUntilPrompt += count;
   }
 }
 
@@ -447,14 +452,33 @@ function nextAlternateScreenState(current: boolean, text: string) {
   return next;
 }
 
-function submitsOrRepaintsPrompt(text: string) {
-  return (
-    text.includes("\r") ||
-    text.includes("\n") ||
-    text.includes(String.fromCharCode(3)) ||
-    text.includes(String.fromCharCode(4)) ||
-    text.includes(String.fromCharCode(12))
-  );
+function countPromptProducingControls(text: string) {
+  let count = 0;
+  for (const char of text) {
+    const code = char.charCodeAt(0);
+    if (code === 3 || code === 4 || code === 10 || code === 12 || code === 13) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function countOccurrences(text: string, search: string) {
+  let count = 0;
+  let index = 0;
+
+  while (index < text.length) {
+    const nextIndex = text.indexOf(search, index);
+    if (nextIndex === -1) {
+      return count;
+    }
+
+    count += 1;
+    index = nextIndex + search.length;
+  }
+
+  return count;
 }
 
 async function sleep(delayMs: number) {
