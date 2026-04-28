@@ -1,6 +1,9 @@
 import { expect, test } from "vite-plus/test";
 import {
+  initialPreviewClientState,
+  nextPreviewClientState,
   paneFrameDataAttributes,
+  previewControlViewState,
   previewPaneHeaderStyle,
   previewFrameSize,
   previewZoomStyle,
@@ -48,6 +51,66 @@ test("preview pane header style scales with terminal zoom", () => {
   expect(previewPaneHeaderStyle({})).toEqual({
     fontSize: "11px",
     height: "24px",
+  });
+});
+
+test("preview client state tracks playbook state and reset generation", () => {
+  const running = nextPreviewClientState(initialPreviewClientState, {
+    action: 'pane("main").type',
+    state: "running",
+    type: "playbook.state",
+  });
+  expect(running.playbookState).toBe("running");
+  expect(running.activeAction).toBe('pane("main").type');
+  expect(running.resetGeneration).toBe(0);
+
+  const reset = nextPreviewClientState(running, { type: "preview.reset" });
+  expect(reset.playbookState).toBe("idle");
+  expect(reset.activeAction).toBeUndefined();
+  expect(reset.resetGeneration).toBe(1);
+});
+
+test("preview controls derive disabled, active, and pending states", () => {
+  expect(
+    previewControlViewState({
+      pendingCommand: undefined,
+      playbookState: "running",
+      socketStatus: "open",
+    }),
+  ).toMatchObject({
+    pauseActive: false,
+    pauseDisabled: false,
+    playActive: true,
+    playDisabled: true,
+    restartDisabled: false,
+    stopDisabled: false,
+  });
+
+  expect(
+    previewControlViewState({
+      pendingCommand: "restart",
+      playbookState: "paused",
+      socketStatus: "open",
+    }),
+  ).toMatchObject({
+    pendingCommand: "restart",
+    pauseActive: true,
+    playDisabled: true,
+    restartDisabled: true,
+    stopDisabled: true,
+  });
+
+  expect(
+    previewControlViewState({
+      pendingCommand: undefined,
+      playbookState: "stopped",
+      socketStatus: "closed",
+    }),
+  ).toMatchObject({
+    pauseDisabled: true,
+    playDisabled: true,
+    restartDisabled: true,
+    stopDisabled: true,
   });
 });
 

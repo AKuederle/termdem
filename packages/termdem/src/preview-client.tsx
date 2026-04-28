@@ -33,12 +33,81 @@ type PreviewSocketContextValue = {
   send(message: BrowserToServerMessage): void;
 };
 
+type SocketStatus = "connecting" | "open" | "closed" | "error";
+type PlaybookUiState = "idle" | "running" | "paused" | "stopped" | "done" | "error";
+type PreviewControlCommand = "play" | "pause" | "restart" | "stop";
+
+export type PreviewClientState = {
+  activeAction?: string;
+  playbookState: PlaybookUiState;
+  resetGeneration: number;
+};
+
+export const initialPreviewClientState: PreviewClientState = {
+  playbookState: "idle",
+  resetGeneration: 0,
+};
+
+export function nextPreviewClientState(
+  state: PreviewClientState,
+  message: ServerToBrowserMessage,
+): PreviewClientState {
+  switch (message.type) {
+    case "playbook.state":
+      return {
+        ...state,
+        activeAction: message.action,
+        playbookState: message.state,
+      };
+    case "preview.reset":
+      return {
+        playbookState: "idle",
+        resetGeneration: state.resetGeneration + 1,
+      };
+    case "pane.meta":
+    case "pane.output":
+    case "pane.status":
+    case "recording.state":
+    case "preview.error":
+      return state;
+    default:
+      message satisfies never;
+      return state;
+  }
+}
+
+export function previewControlViewState({
+  pendingCommand,
+  playbookState,
+  socketStatus,
+}: {
+  pendingCommand?: PreviewControlCommand;
+  playbookState: PlaybookUiState;
+  socketStatus: SocketStatus;
+}) {
+  const socketUnavailable = socketStatus !== "open";
+  const commandPending = pendingCommand !== undefined;
+  const running = playbookState === "running";
+  const paused = playbookState === "paused";
+
+  return {
+    pauseActive: paused,
+    pauseDisabled: socketUnavailable || commandPending || !running,
+    pendingCommand,
+    playActive: running,
+    playDisabled: socketUnavailable || commandPending || running,
+    restartDisabled: socketUnavailable || commandPending,
+    stopDisabled: socketUnavailable || commandPending || (!running && !paused),
+  };
+}
+
 const paneFrameClassName =
   "flex min-h-0 min-w-0 flex-col overflow-hidden bg-[#101010] text-slate-100";
 
 const CurrentPaneNameContext = createContext<string | null>(null);
 const PreviewSettingsContext = createContext<RecordingConfig>({});
 const PreviewSocketContext = createContext<PreviewSocketContextValue | null>(null);
+const PreviewResetGenerationContext = createContext(0);
 const defaultPaneHeaderFontSizePx = 11;
 const defaultPaneHeaderHeightPx = 24;
 const defaultTerminalFontSizePx = 14;
@@ -127,11 +196,11 @@ function syncEmbeddedPreviewState(iframe: HTMLIFrameElement | null) {
 function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   const paneNames = useInitialValue(() => paneNamesFromTerminalDefinitions(demo.panes));
   const initialAutostart = useInitialValue(() => readInitialAutostart());
+  const [clientState, setClientState] = useState(initialPreviewClientState);
   const [currentPaneName, setCurrentPaneName] = useState<string | null>(null);
   const [overlayVisible, setOverlayVisible] = useState(false);
-  const [socketStatus, setSocketStatus] = useState<"connecting" | "open" | "closed" | "error">(
-    "connecting",
-  );
+  const [pendingCommand, setPendingCommand] = useState<PreviewControlCommand | undefined>();
+  const [socketStatus, setSocketStatus] = useState<SocketStatus>("connecting");
   const listenersRef = useRef(new Map<string, Set<(message: ServerToBrowserMessage) => void>>());
   const pendingMessagesRef = useRef<BrowserToServerMessage[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
@@ -165,6 +234,27 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   );
 
   const paneComponents = useMemo(() => createPaneComponents(paneNames), [paneNames]);
+  const sendControl = useEffectEvent((command: PreviewControlCommand) => {
+    setPendingCommand(command);
+    switch (command) {
+      case "play":
+        send({
+          type: clientState.playbookState === "paused" ? "playbook.resume" : "playbook.start",
+        });
+        return;
+      case "pause":
+        send({ type: "playbook.pause" });
+        return;
+      case "restart":
+        send({ type: "playbook.restart" });
+        return;
+      case "stop":
+        send({ type: "playbook.stop" });
+        return;
+      default:
+        command satisfies never;
+    }
+  });
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -231,8 +321,17 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
           return;
         }
         case "playbook.state":
+          setClientState((state) => nextPreviewClientState(state, message));
+          setPendingCommand(undefined);
           if (message.state === "running") {
             setCurrentPaneName(paneNameFromAction(message.action) ?? currentPaneName);
+          }
+          if (
+            message.state === "paused" ||
+            message.state === "stopped" ||
+            message.state === "done"
+          ) {
+            setCurrentPaneName(null);
           }
           if (message.state === "error") {
             markRecordingError(message.error ?? "Playbook failed");
@@ -243,6 +342,11 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
           return;
         case "preview.error":
           markRecordingError(message.message);
+          return;
+        case "preview.reset":
+          setClientState((state) => nextPreviewClientState(state, message));
+          setCurrentPaneName(null);
+          setPendingCommand(undefined);
           return;
         default:
           message satisfies never;
@@ -262,33 +366,38 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
     globalThis.__termdem = {
       ...globalThis.__termdem,
       controls: {
-        restart: () => send({ type: "playbook.restart" }),
-        start: () => send({ type: "playbook.start" }),
-        stop: () => send({ type: "playbook.stop" }),
+        restart: () => sendControl("restart"),
+        start: () => sendControl("play"),
+        stop: () => sendControl("stop"),
       },
     };
 
     return () => {
       delete globalThis.__termdem?.controls;
     };
-  }, [send]);
+  }, [sendControl]);
 
   return (
     <PreviewSocketContext value={socketContext}>
       <PreviewSettingsContext value={demo.settings}>
         <CurrentPaneNameContext value={currentPaneName}>
-          {demo.render(paneComponents)}
+          <PreviewResetGenerationContext value={clientState.resetGeneration}>
+            {demo.render(paneComponents)}
+          </PreviewResetGenerationContext>
         </CurrentPaneNameContext>
       </PreviewSettingsContext>
       {overlayVisible ? (
         <PreviewOverlay
-          mode={socketStatus}
+          pendingCommand={pendingCommand}
+          playbookState={clientState.playbookState}
+          socketStatus={socketStatus}
           onHide={() => {
             setOverlayVisible(false);
           }}
-          onRestart={() => send({ type: "playbook.restart" })}
-          onStart={() => send({ type: "playbook.start" })}
-          onStop={() => send({ type: "playbook.stop" })}
+          onPause={() => sendControl("pause")}
+          onPlay={() => sendControl("play")}
+          onRestart={() => sendControl("restart")}
+          onStop={() => sendControl("stop")}
         />
       ) : null}
     </PreviewSocketContext>
@@ -331,6 +440,7 @@ function PaneTerminalCard({
 }) {
   const currentPaneName = useContext(CurrentPaneNameContext);
   const previewSettings = useContext(PreviewSettingsContext);
+  const resetGeneration = useContext(PreviewResetGenerationContext);
   const embeddedPreview = useInitialValue(readEmbeddedPreview);
   const previewSocket = usePreviewSocket();
   const { ref, write } = useTerminal();
@@ -356,6 +466,9 @@ function PaneTerminalCard({
   });
 
   useEffect(() => previewSocket.addPaneListener(name, handleMessage), [handleMessage, name]);
+  useEffect(() => {
+    setStatus("connecting");
+  }, [resetGeneration]);
 
   return (
     <article
@@ -371,6 +484,7 @@ function PaneTerminalCard({
       </header>
 
       <Terminal
+        key={`${name}:${resetGeneration}`}
         ref={ref}
         aria-label={`${name} terminal (${status})`}
         className="min-h-0 flex-1 overflow-hidden !rounded-none"
@@ -411,35 +525,129 @@ function createPaneComponents(paneNames: string[]) {
 }
 
 function PreviewOverlay({
-  mode,
   onHide,
+  onPause,
+  onPlay,
   onRestart,
-  onStart,
   onStop,
+  pendingCommand,
+  playbookState,
+  socketStatus,
 }: {
-  mode: string;
   onHide: () => void;
+  onPause: () => void;
+  onPlay: () => void;
   onRestart: () => void;
-  onStart: () => void;
   onStop: () => void;
+  pendingCommand?: PreviewControlCommand;
+  playbookState: PlaybookUiState;
+  socketStatus: SocketStatus;
 }) {
+  const controls = previewControlViewState({ pendingCommand, playbookState, socketStatus });
+
   return (
-    <div className="fixed right-4 top-4 z-50 flex items-center gap-2 rounded bg-black/80 p-2 font-mono text-xs text-white shadow-lg">
-      <span>{mode}</span>
-      <button className="rounded bg-cyan-600 px-2 py-1" type="button" onClick={onStart}>
-        Start
-      </button>
-      <button className="rounded bg-slate-700 px-2 py-1" type="button" onClick={onRestart}>
-        Restart
-      </button>
-      <button className="rounded bg-slate-700 px-2 py-1" type="button" onClick={onStop}>
-        Stop
-      </button>
-      <button className="rounded bg-slate-700 px-2 py-1" type="button" onClick={onHide}>
-        Close
-      </button>
+    <div className="fixed right-4 top-4 z-50 flex items-center gap-1 rounded bg-black/85 p-1.5 font-mono text-xs text-white shadow-lg ring-1 ring-white/10">
+      <span className="min-w-20 px-2 text-slate-300">
+        {socketStatus === "open" ? playbookState : socketStatus}
+      </span>
+      <IconButton
+        active={controls.playActive}
+        disabled={controls.playDisabled}
+        label={playbookState === "paused" ? "Resume" : "Play"}
+        pending={pendingCommand === "play"}
+        onClick={onPlay}
+      >
+        <PlayIcon />
+      </IconButton>
+      <IconButton
+        active={controls.pauseActive}
+        disabled={controls.pauseDisabled}
+        label="Pause"
+        pending={pendingCommand === "pause"}
+        onClick={onPause}
+      >
+        <PauseIcon />
+      </IconButton>
+      <IconButton
+        disabled={controls.stopDisabled}
+        label="Stop"
+        pending={pendingCommand === "stop"}
+        onClick={onStop}
+      >
+        <StopIcon />
+      </IconButton>
+      <IconButton
+        disabled={controls.restartDisabled}
+        label="Restart"
+        pending={pendingCommand === "restart"}
+        onClick={onRestart}
+      >
+        <RestartIcon />
+      </IconButton>
+      <IconButton label="Close controls" onClick={onHide}>
+        <CloseIcon />
+      </IconButton>
     </div>
   );
+}
+
+function IconButton({
+  active = false,
+  children,
+  disabled = false,
+  label,
+  onClick,
+  pending = false,
+}: {
+  active?: boolean;
+  children: ReactNode;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+  pending?: boolean;
+}) {
+  const className = [
+    "grid h-8 w-8 place-items-center rounded border transition",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300",
+    active
+      ? "border-cyan-300 bg-cyan-500/30 text-cyan-100"
+      : "border-white/10 bg-slate-800 text-slate-100",
+    pending ? "scale-95 border-cyan-200 bg-cyan-600/40" : "",
+    disabled ? "cursor-not-allowed opacity-40" : "hover:bg-slate-700 active:scale-95",
+  ].join(" ");
+
+  return (
+    <button
+      aria-label={label}
+      className={className}
+      disabled={disabled}
+      title={label}
+      type="button"
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+function PlayIcon() {
+  return <span aria-hidden="true">▶</span>;
+}
+
+function PauseIcon() {
+  return <span aria-hidden="true">Ⅱ</span>;
+}
+
+function StopIcon() {
+  return <span aria-hidden="true">■</span>;
+}
+
+function RestartIcon() {
+  return <span aria-hidden="true">↻</span>;
+}
+
+function CloseIcon() {
+  return <span aria-hidden="true">×</span>;
 }
 
 function paneNamesFromTerminalDefinitions(terminalDefinitions: readonly { name: string }[]) {
