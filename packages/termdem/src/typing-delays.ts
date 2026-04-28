@@ -1,8 +1,8 @@
 export const typingDelays = {
-  WPM_30: 400,
-  WPM_60: 200,
-  WPM_80: 150,
-  WPM_120: 100,
+  WPM_30: 250,
+  WPM_60: 100,
+  WPM_80: 75,
+  WPM_120: 50,
 } as const;
 
 export type TypingDelay = (typeof typingDelays)[keyof typeof typingDelays];
