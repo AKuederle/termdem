@@ -325,7 +325,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
           setClientState((state) => nextPreviewClientState(state, message));
           setPendingCommand(undefined);
           if (message.state === "running") {
-            setCurrentPaneName(paneNameFromAction(message.action) ?? currentPaneName);
+            setCurrentPaneName((name) => paneNameFromAction(message.action) ?? name);
           }
           if (message.state === "stopped" || message.state === "done") {
             setCurrentPaneName(null);
@@ -464,6 +464,22 @@ export function readWtermScreen(wterm: WtermScreenReadable | null): PaneScreenSn
   };
 }
 
+type ScrollableTerminalElement = Pick<HTMLElement, "clientHeight" | "scrollHeight" | "scrollTop">;
+
+export function scrollTerminalElementToBottom(element: ScrollableTerminalElement | null) {
+  if (!element) {
+    return;
+  }
+
+  element.scrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+}
+
+function scheduleTerminalScrollToBottom(element: HTMLElement | null | undefined) {
+  requestAnimationFrame(() => {
+    scrollTerminalElementToBottom(element ?? null);
+  });
+}
+
 function PaneTerminalCard({
   className,
   name,
@@ -488,6 +504,7 @@ function PaneTerminalCard({
         return;
       case "pane.output":
         write(message.data);
+        scheduleTerminalScrollToBottom(ref.current?.instance?.element);
         return;
       case "pane.screen.request":
         previewSocket.send({

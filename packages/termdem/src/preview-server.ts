@@ -391,7 +391,9 @@ async function wirePreviewClient({
   const runtimeReady = (async () => {
     const demo = await loadDemoModule(viteServer, demoPath);
     let activeRuntime = getRuntime();
+    let replayBufferedState = true;
     if (!activeRuntime) {
+      replayBufferedState = false;
       activeRuntime = new PlaybookRuntime({
         onPaneMeta(message) {
           broadcast({ type: "pane.meta", ...message });
@@ -418,12 +420,14 @@ async function wirePreviewClient({
       await activeRuntime.ensureReady();
     }
 
-    for (const message of latestMessages.values()) {
-      sendPreviewMessage(ws, message);
-    }
-    for (const [pane, data] of paneOutputBuffers) {
-      if (data !== "") {
-        sendPreviewMessage(ws, { type: "pane.output", pane, data });
+    if (replayBufferedState) {
+      for (const message of latestMessages.values()) {
+        sendPreviewMessage(ws, message);
+      }
+      for (const [pane, data] of paneOutputBuffers) {
+        if (data !== "") {
+          sendPreviewMessage(ws, { type: "pane.output", pane, data });
+        }
       }
     }
 

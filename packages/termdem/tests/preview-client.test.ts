@@ -8,6 +8,7 @@ import {
   previewFrameSize,
   previewZoomStyle,
   readWtermScreen,
+  scrollTerminalElementToBottom,
 } from "../src/preview-client.tsx";
 import { queueOrSendPreviewMessage } from "../src/preview-socket.ts";
 
@@ -95,6 +96,30 @@ test("readWtermScreen returns empty snapshots before the terminal bridge is read
     scrollbackCount: 0,
     text: "",
   });
+});
+
+test("scrollTerminalElementToBottom pins overflowing terminal output to the tail", () => {
+  const element = {
+    clientHeight: 120,
+    scrollHeight: 480,
+    scrollTop: 0,
+  };
+
+  scrollTerminalElementToBottom(element);
+
+  expect(element.scrollTop).toBe(360);
+});
+
+test("scrollTerminalElementToBottom keeps non-overflowing terminal output at the top", () => {
+  const element = {
+    clientHeight: 480,
+    scrollHeight: 120,
+    scrollTop: 24,
+  };
+
+  scrollTerminalElementToBottom(element);
+
+  expect(element.scrollTop).toBe(0);
 });
 
 test("preview client state tracks playbook state and reset generation", () => {

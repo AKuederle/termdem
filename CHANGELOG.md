@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed preview pane output replay duplicating initial terminal prompts for the client that creates the runtime.
+- Fixed preview current-pane highlighting to preserve the latest pane while action updates are processed.
+- Fixed preview terminal panes staying scrolled to the top after scrollback appears during recordings.
 - Fixed preview client handling for demo modules that import Node builtins at module scope.
 - Documented and covered setup-time pane exports persisting into visible script commands.
 - Fixed the published package's Vite dependency to resolve to real Vite instead of Vite Plus core.
