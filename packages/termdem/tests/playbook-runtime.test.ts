@@ -210,6 +210,63 @@ test("playbook runtime cancellation prevents stale playbook completion", async (
   expect(states).not.toContain("done");
 });
 
+test("playbook runtime pause blocks wait until resume without cancelling the run", async () => {
+  const states: string[] = [];
+  const runtime = new PlaybookRuntime({
+    onPlaybookState(state) {
+      states.push(state.state);
+    },
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
+    typeDelayMs: 0,
+  });
+  let completed = false;
+
+  const run = runtime.run(async (api) => {
+    await api.wait(50);
+    completed = true;
+  });
+
+  await waitFor(() => states.includes("running"));
+  runtime.pause();
+  await sleep(100);
+
+  expect(completed).toBe(false);
+  expect(states).toContain("paused");
+
+  runtime.resume();
+  await run;
+
+  expect(completed).toBe(true);
+  expect(states.at(-1)).toBe("done");
+});
+
+test("playbook runtime stop cancels a paused run", async () => {
+  const states: string[] = [];
+  const runtime = new PlaybookRuntime({
+    onPlaybookState(state) {
+      states.push(state.state);
+    },
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
+    typeDelayMs: 0,
+  });
+  let completed = false;
+
+  const run = runtime.run(async (api) => {
+    await api.wait(5_000);
+    completed = true;
+  });
+
+  await waitFor(() => states.includes("running"));
+  runtime.pause();
+  await waitFor(() => states.includes("paused"));
+  runtime.stop();
+  await run;
+
+  expect(completed).toBe(false);
+  expect(states).toContain("stopped");
+  expect(states).not.toContain("done");
+});
+
 test("playbook runtime ignores overlapping start requests", async () => {
   const runtime = new PlaybookRuntime({
     terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
