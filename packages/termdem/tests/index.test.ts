@@ -3,15 +3,7 @@ import { tmpdir } from "node:os";
 import { stripVTControlCharacters } from "node:util";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
-import {
-  Dir,
-  execNode,
-  ExecNodeError,
-  keys,
-  quoteShellArg,
-  TmpDir,
-  typingDelays,
-} from "../src/index.ts";
+import { Dir, keys, quoteShellArg, TmpDir, typingDelays } from "../src/index.ts";
 import { normalizeExecCapture } from "../src/normalize.ts";
 import { createPaneSession } from "../src/pane-session.ts";
 import { resolveRecordingConfig } from "../src/recording-config.ts";
@@ -259,46 +251,6 @@ test("typingDelays exposes common typing speeds as per-character delays", () => 
   expect(typingDelays.WPM_60).toBe(200);
   expect(typingDelays.WPM_80).toBe(150);
   expect(typingDelays.WPM_120).toBe(100);
-});
-
-test("execNode executes a Node script and captures output", async () => {
-  const cwd = await createTempDir();
-  const scriptPath = join(cwd, "echo.mjs");
-  await writeFile(
-    scriptPath,
-    "process.stdout.write(process.argv.slice(2).join('|')); process.stderr.write('warn');\n",
-    "utf8",
-  );
-
-  const result = await execNode(scriptPath, ["alpha", "beta"]);
-
-  expect(result).toEqual({
-    exitCode: 0,
-    stderr: "warn",
-    stdout: "alpha|beta",
-  });
-});
-
-test("execNode rejects by default and can return non-zero results", async () => {
-  const cwd = await createTempDir();
-  const scriptPath = join(cwd, "fail.mjs");
-  await writeFile(
-    scriptPath,
-    "process.stdout.write('before'); process.stderr.write('failed'); process.exit(7);\n",
-    "utf8",
-  );
-
-  await expect(execNode(scriptPath)).rejects.toMatchObject({
-    exitCode: 7,
-    stderr: "failed",
-    stdout: "before",
-  } satisfies Partial<ExecNodeError>);
-
-  await expect(execNode(scriptPath, [], { reject: false })).resolves.toEqual({
-    exitCode: 7,
-    stderr: "failed",
-    stdout: "before",
-  });
 });
 
 test("resolveRecordingConfig uses CLI size for recording and viewport by default", () => {

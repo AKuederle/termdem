@@ -39,9 +39,6 @@ export type NodeExecResult = {
   stdout: string;
 };
 
-export type ExecNodeOptions = NodeExecOptions;
-export type ExecNodeResult = NodeExecResult;
-
 export type WaitForOptions = {
   intervalMs?: number;
   timeoutMs?: number;

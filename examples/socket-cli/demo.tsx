@@ -1,7 +1,6 @@
 import {
   Dir,
   createTerminalDemo,
-  execNode,
   quoteShellArg,
   typingDelays,
   type TerminalPaneComponents,
@@ -13,9 +12,6 @@ const workspace = new Dir(() => workspacePath);
 const demo = createTerminalDemo(
   [
     {
-      cleanup: async ({ cwd }) => {
-        await execNode(`${cwd}/scripts/server.mjs`, ["cleanup"], { reject: false });
-      },
       name: "server",
       pwd: workspace,
     },
@@ -54,6 +50,11 @@ const demo = createTerminalDemo(
       `node scripts/client.mjs send ${quoteShellArg(url)} ${quoteShellArg("message from sender pane")}`,
     );
     await server.exec("node scripts/server.mjs status");
+    await api.node.execFile("node", ["scripts/server.mjs", "cleanup"], {
+      cwd: workspacePath,
+      reject: false,
+      timeoutMs: 1_000,
+    });
   },
   {
     size: { width: 1920, height: 1080 },

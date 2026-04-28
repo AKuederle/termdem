@@ -1,5 +1,3 @@
-import type { ExecResult } from "./types.ts";
-
 export type PaneInputMessage = {
   type: "pane.input";
   pane: string;
@@ -71,9 +69,6 @@ export type ServerToBrowserMessage =
   | PlaybookStateMessage
   | RecordingStateMessage
   | PreviewErrorMessage;
-
-export type PaneClientMessage = BrowserToServerMessage;
-export type PaneServerMessage = ServerToBrowserMessage;
 
 export function parseBrowserToServerMessage(raw: string): BrowserToServerMessage | null {
   const payload = parseObject(raw);
@@ -183,9 +178,6 @@ export function parseServerToBrowserMessage(raw: string): ServerToBrowserMessage
   }
 }
 
-export const parsePaneClientMessage = parseBrowserToServerMessage;
-export const parsePaneServerMessage = parseServerToBrowserMessage;
-
 function parseObject(raw: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -221,18 +213,4 @@ function isPlaybookState(value: unknown) {
 
 function isRecordingState(value: unknown) {
   return value === "ready" || value === "started" || value === "done" || value === "error";
-}
-
-export function isExecResult(value: unknown): value is ExecResult {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as ExecResult).command === "string" &&
-    typeof (value as ExecResult).exitCode === "number" &&
-    typeof (value as ExecResult).raw === "string" &&
-    typeof (value as ExecResult).text === "string" &&
-    Array.isArray((value as ExecResult).lines) &&
-    typeof (value as ExecResult).startedAt === "number" &&
-    typeof (value as ExecResult).endedAt === "number"
-  );
 }

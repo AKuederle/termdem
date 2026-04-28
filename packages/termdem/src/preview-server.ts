@@ -147,8 +147,10 @@ function ptyBridge({ demoPath }: { demoPath: string }): Plugin {
   let viteServer: ViteDevServer | null = null;
   let runtime: PlaybookRuntime | null = null;
   const clients = new Set<WebSocket>();
+  const latestMessages = new Map<string, ServerToBrowserMessage>();
 
   const broadcast = (message: ServerToBrowserMessage) => {
+    rememberLatestMessage(latestMessages, message);
     for (const client of clients) {
       sendPreviewMessage(client, message);
     }
@@ -183,6 +185,7 @@ function ptyBridge({ demoPath }: { demoPath: string }): Plugin {
             clients,
             demoPath,
             getRuntime: () => runtime,
+            latestMessages,
             saveRuntime(nextRuntime) {
               runtime = nextRuntime;
             },
@@ -217,6 +220,7 @@ async function wirePreviewClient({
   clients,
   demoPath,
   getRuntime,
+  latestMessages,
   saveRuntime,
   viteServer,
   ws,
@@ -225,6 +229,7 @@ async function wirePreviewClient({
   clients: Set<WebSocket>;
   demoPath: string;
   getRuntime: () => PlaybookRuntime | null;
+  latestMessages: Map<string, ServerToBrowserMessage>;
   saveRuntime: (runtime: PlaybookRuntime) => void;
   viteServer: ViteDevServer;
   ws: WebSocket;
@@ -271,6 +276,10 @@ async function wirePreviewClient({
       });
       saveRuntime(activeRuntime);
       await activeRuntime.ensureReady();
+    }
+
+    for (const message of latestMessages.values()) {
+      sendPreviewMessage(ws, message);
     }
 
     ws.on("message", (message) => {
@@ -346,6 +355,27 @@ function sendPreviewMessage(ws: WebSocket, message: ServerToBrowserMessage) {
   }
 
   ws.send(JSON.stringify(message));
+}
+
+function rememberLatestMessage(
+  latestMessages: Map<string, ServerToBrowserMessage>,
+  message: ServerToBrowserMessage,
+) {
+  switch (message.type) {
+    case "pane.meta":
+    case "pane.status":
+      latestMessages.set(`${message.type}:${message.pane}`, message);
+      return;
+    case "playbook.state":
+    case "recording.state":
+      latestMessages.set(message.type, message);
+      return;
+    case "pane.output":
+    case "preview.error":
+      return;
+    default:
+      message satisfies never;
+  }
 }
 
 function formatError(error: unknown) {
