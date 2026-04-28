@@ -722,7 +722,6 @@ function termdemClientShim({
 function runtimeDependencyAliases(): Alias[] {
   return [
     exactAlias("@akuederle/termdem/preview-client"),
-    exactAlias("@akuederle/termdem/scene"),
     exactAlias("@wterm/react"),
     exactAlias("@wterm/react/css"),
   ];

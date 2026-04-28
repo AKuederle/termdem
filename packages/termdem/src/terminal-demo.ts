@@ -5,15 +5,6 @@ import { type TerminalWorkspaceDefinition } from "./workspace.ts";
 
 export type TerminalDefinition = TerminalWorkspaceDefinition;
 
-export type TerminalHandle<Name extends string = string> = {
-  name: Name;
-};
-
-export type TerminalHandles<TDemo extends TerminalDemo<readonly TerminalDefinition[]>> =
-  TDemo extends TerminalDemo<infer TTerminals>
-    ? Record<TTerminals[number]["name"], TerminalHandle<TTerminals[number]["name"]>>
-    : never;
-
 export type TerminalPaneProps = {
   className?: string;
   style?: CSSProperties;

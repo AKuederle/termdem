@@ -51,31 +51,32 @@ Acceptance criteria:
 - `exec` semantics are representable without requiring the browser to infer command boundaries
 - pane addressing is by stable pane name only
 
-## Milestone 2: Named Pane Scene Model
+## Milestone 2: Named Pane Component Model
 
-### Task 3. Create a React scene model with named panes
+### Task 3. Create typed React pane components
 
-Implement the TSX scene layer for declaring panes in code.
+Implement the TSX render contract for placing runtime-provided pane components in user layouts.
 
 Deliverables:
 
-- `Stage` component
-- `Pane` component
-- pane registration mechanism
+- generated pane components keyed by terminal name
+- typed render props for pane placement
+- pane mount validation
 
 Acceptance criteria:
 
-- panes can be declared in TSX with unique names
+- panes can be placed in TSX by terminal name
 - duplicate pane names fail clearly
+- missing or duplicated pane component mounts fail clearly
 - scripts and runtime logic can resolve panes by name without inspecting layout internals
 
-### Task 4. Connect pane declarations to browser terminal surfaces
+### Task 4. Connect pane components to browser terminal surfaces
 
-Bind scene panes to browser-rendered `wterm` instances.
+Bind rendered pane components to browser-rendered `wterm` instances.
 
 Deliverables:
 
-- pane-to-terminal mounting logic
+- pane component-to-terminal mounting logic
 - lifecycle handling for connect, disconnect, and resize
 
 Acceptance criteria:
@@ -219,7 +220,7 @@ Scenario:
 
 Deliverables:
 
-- a demo scene with at least one named pane
+- a demo layout with at least one named pane component
 - a script that runs the validation scenario
 
 Acceptance criteria:
@@ -232,11 +233,11 @@ Acceptance criteria:
 
 ## Milestone 7: Testing
 
-### Task 13. Add unit tests for runtime contracts and scene registration
+### Task 13. Add unit tests for runtime contracts and pane registration
 
 Acceptance criteria:
 
-- pane registration behavior is covered
+- pane component registration behavior is covered
 - duplicate naming behavior is covered
 - public runtime contracts remain narrow and stable
 

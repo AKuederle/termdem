@@ -19,7 +19,7 @@ The first version of `termdem` will provide a minimal but coherent scripting mod
 - `press(key)` to send a specific key such as Enter
 - `exec(command, options)` to visibly simulate typing plus Enter, while internally capturing the command's actual output and exit code in a structured result
 
-Terminal panes will be declared in a TSX React scene using named `Pane` components. Each pane name maps to a backend PTY session rendered in the browser with `wterm`.
+Terminal panes will be provided to the TSX render function as named React components. Each pane name maps to a backend PTY session rendered in the browser with `wterm`.
 
 The key behavior of `exec()` is that it must look like real typing to the viewer but still return a pruned, machine-usable result to the script. This will be implemented by separating what the viewer sees from what the shell actually receives. The runtime will instrument command submission on the backend, capture output between runtime markers, remove those markers and terminal noise from the returned scripting result, and expose normalized text and lines for subsequent steps.
 
@@ -66,7 +66,7 @@ If this flow works reliably, the core execution model is validated.
 - The v1 execution surface is limited to three primitives: `type`, `press`, and `exec`.
 - `exec` is the central primitive. It must behave visually like `type(command)` followed by `press("Enter")`, but it must additionally return structured execution results.
 - `exec` must support a typing delay option directly, rather than forcing callers to animate typing separately.
-- The runtime will use a named pane model. React scene declarations define pane names and layout; scripts refer to panes only by name.
+- The runtime will use a named pane model. Terminal definitions define pane names, render functions place the corresponding pane components, and scripts refer to panes only by name.
 - The browser terminal is a rendering surface backed by `wterm`. The backend PTY session remains authoritative for command execution and output capture.
 - The first implementation should favor a deterministic shell environment so the runtime can reason about prompts, echoed input, and command boundaries predictably.
 - Command execution boundaries will be identified by backend instrumentation rather than by trying to infer completion from prompt heuristics alone.
@@ -86,7 +86,7 @@ If this flow works reliably, the core execution model is validated.
 - The first implementation should not introduce hidden steps, hidden input semantics, recording, exporting, or a template-literal DSL. Those can be layered on top after the execution model is stable.
 - The initial API should remain explicit and imperative rather than magical. A DSL can be added later as syntax sugar over stable primitives.
 - The system should be decomposed into a small number of deep modules:
-  - a scene model that registers named panes
+  - a pane component model that registers mounted panes
   - a pane session runtime that owns PTY lifecycle and visible input actions
   - an execution module that implements `exec` instrumentation, capture, pruning, and result assembly
   - a browser presentation layer that renders pane output via `wterm`
@@ -100,7 +100,7 @@ If this flow works reliably, the core execution model is validated.
 ## Testing Decisions
 
 - Good tests should validate observable behavior rather than implementation details. Tests should assert what a script author receives from `type`, `press`, and `exec`, and what a viewer would observe in the pane, not how the runtime internally stores buffers or markers.
-- The scene model should be tested for stable pane registration and name uniqueness behavior.
+- The pane component model should be tested for stable pane registration and name uniqueness behavior.
 - The pane session runtime should be tested for visible typing behavior, key dispatch behavior, and PTY interaction at the API level.
 - The execution module should receive the heaviest test coverage. It should be tested for:
   - command boundary detection
@@ -135,7 +135,7 @@ If this flow works reliably, the core execution model is validated.
 - The v1 cleanup strategy should prefer a small owned normalization module over a large dependency stack. Third-party or built-in utilities are acceptable for low-level VT stripping, but the runtime must own the semantics that matter to scripting correctness.
 - The first milestone should be considered successful only if one command can produce a result that directly determines the next command.
 - The recommended delivery order is:
-  1. establish a named pane scene model
+  1. establish a named pane component model
   2. implement pane PTY sessions with `type` and `press`
   3. implement backend-instrumented `exec`
   4. add pruning and structured results

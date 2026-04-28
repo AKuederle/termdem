@@ -11,7 +11,6 @@ export default defineConfig({
       "src/preview-client.tsx",
       "src/preview-server.ts",
       "src/protocol.ts",
-      "src/scene.ts",
     ],
   },
   lint: {

@@ -25,7 +25,6 @@
     "./preview-client": "./dist/preview-client.mjs",
     "./preview-server": "./dist/preview-server.mjs",
     "./protocol": "./dist/protocol.mjs",
-    "./scene": "./dist/scene.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {
