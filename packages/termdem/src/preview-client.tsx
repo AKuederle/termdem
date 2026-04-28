@@ -34,8 +34,8 @@ type PreviewSocketContextValue = {
 };
 
 type SocketStatus = "connecting" | "open" | "closed" | "error";
-type PlaybookUiState = "idle" | "running" | "paused" | "stopped" | "done" | "error";
-type PreviewControlCommand = "play" | "pause" | "restart" | "stop";
+type PlaybookUiState = "idle" | "running" | "stopped" | "done" | "error";
+type PreviewControlCommand = "restart" | "stop";
 
 export type PreviewClientState = {
   activeAction?: string;
@@ -88,16 +88,11 @@ export function previewControlViewState({
   const socketUnavailable = socketStatus !== "open";
   const commandPending = pendingCommand !== undefined;
   const running = playbookState === "running";
-  const paused = playbookState === "paused";
 
   return {
-    pauseActive: paused,
-    pauseDisabled: socketUnavailable || commandPending || !running,
     pendingCommand,
-    playActive: running,
-    playDisabled: socketUnavailable || commandPending || running,
     restartDisabled: socketUnavailable || commandPending,
-    stopDisabled: socketUnavailable || commandPending || (!running && !paused),
+    stopDisabled: socketUnavailable || commandPending || !running,
   };
 }
 
@@ -237,14 +232,6 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
   const sendControl = useEffectEvent((command: PreviewControlCommand) => {
     setPendingCommand(command);
     switch (command) {
-      case "play":
-        send({
-          type: clientState.playbookState === "paused" ? "playbook.resume" : "playbook.start",
-        });
-        return;
-      case "pause":
-        send({ type: "playbook.pause" });
-        return;
       case "restart":
         send({ type: "playbook.restart" });
         return;
@@ -326,11 +313,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
           if (message.state === "running") {
             setCurrentPaneName(paneNameFromAction(message.action) ?? currentPaneName);
           }
-          if (
-            message.state === "paused" ||
-            message.state === "stopped" ||
-            message.state === "done"
-          ) {
+          if (message.state === "stopped" || message.state === "done") {
             setCurrentPaneName(null);
           }
           if (message.state === "error") {
@@ -367,7 +350,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
       ...globalThis.__termdem,
       controls: {
         restart: () => sendControl("restart"),
-        start: () => sendControl("play"),
+        start: () => send({ type: "playbook.start" }),
         stop: () => sendControl("stop"),
       },
     };
@@ -394,8 +377,6 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
           onHide={() => {
             setOverlayVisible(false);
           }}
-          onPause={() => sendControl("pause")}
-          onPlay={() => sendControl("play")}
           onRestart={() => sendControl("restart")}
           onStop={() => sendControl("stop")}
         />
@@ -526,8 +507,6 @@ function createPaneComponents(paneNames: string[]) {
 
 function PreviewOverlay({
   onHide,
-  onPause,
-  onPlay,
   onRestart,
   onStop,
   pendingCommand,
@@ -535,8 +514,6 @@ function PreviewOverlay({
   socketStatus,
 }: {
   onHide: () => void;
-  onPause: () => void;
-  onPlay: () => void;
   onRestart: () => void;
   onStop: () => void;
   pendingCommand?: PreviewControlCommand;
@@ -554,24 +531,6 @@ function PreviewOverlay({
         {socketStatus === "open" ? playbookState : socketStatus}
       </span>
       <IconButton
-        active={controls.playActive}
-        disabled={controls.playDisabled}
-        label={playbookState === "paused" ? "Resume" : "Play"}
-        pending={pendingCommand === "play"}
-        onClick={onPlay}
-      >
-        <PlayIcon />
-      </IconButton>
-      <IconButton
-        active={controls.pauseActive}
-        disabled={controls.pauseDisabled}
-        label="Pause"
-        pending={pendingCommand === "pause"}
-        onClick={onPause}
-      >
-        <PauseIcon />
-      </IconButton>
-      <IconButton
         disabled={controls.stopDisabled}
         label="Stop"
         pending={pendingCommand === "stop"}
@@ -581,7 +540,7 @@ function PreviewOverlay({
       </IconButton>
       <IconButton
         disabled={controls.restartDisabled}
-        label="Restart"
+        label="Replay"
         pending={pendingCommand === "restart"}
         onClick={onRestart}
       >
@@ -632,14 +591,6 @@ function IconButton({
       {children}
     </button>
   );
-}
-
-function PlayIcon() {
-  return <span aria-hidden="true">▶</span>;
-}
-
-function PauseIcon() {
-  return <span aria-hidden="true">Ⅱ</span>;
 }
 
 function StopIcon() {

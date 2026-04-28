@@ -349,12 +349,6 @@ async function handleBrowserMessage({
         await runtime.run(demo.script, { setup: demo.setup, teardown: demo.teardown });
       }
       return;
-    case "playbook.resume":
-      runtime.resume();
-      return;
-    case "playbook.pause":
-      runtime.pause();
-      return;
     case "playbook.stop":
       runtime.stop();
       return;

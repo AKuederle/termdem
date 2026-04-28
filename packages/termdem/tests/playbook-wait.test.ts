@@ -17,7 +17,7 @@ test("playbook wait delays for the requested active time", async () => {
   expect(sleeps).toEqual([25, 25, 25]);
 });
 
-test("playbook wait does not count time spent waiting for resume", async () => {
+test("playbook wait does not count time spent in active checks", async () => {
   let now = 0;
   let activeChecks = 0;
 

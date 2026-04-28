@@ -27,7 +27,6 @@ import {
 export type PlaybookState =
   | { state: "idle" }
   | { state: "running"; action?: string }
-  | { state: "paused" }
   | { state: "stopped" }
   | { state: "done" }
   | { state: "error"; error: string };
@@ -73,8 +72,6 @@ export class PlaybookRuntime<Name extends string = string> {
   private generation = 0;
   private closed = false;
   private hiddenPaneOutputDepth = 0;
-  private paused = false;
-  private readonly resumeWaiters = new Set<() => void>();
 
   constructor(options: PlaybookRuntimeOptions) {
     this.options = options;
@@ -138,29 +135,8 @@ export class PlaybookRuntime<Name extends string = string> {
 
   stop() {
     this.generation += 1;
-    this.paused = false;
-    this.resolvePauseWaiters();
     this.activeRun = null;
     this.publishPlaybookState({ state: "stopped" });
-  }
-
-  pause() {
-    if (!this.activeRun || this.paused) {
-      return;
-    }
-
-    this.paused = true;
-    this.publishPlaybookState({ state: "paused" });
-  }
-
-  resume() {
-    if (!this.paused) {
-      return;
-    }
-
-    this.paused = false;
-    this.resolvePauseWaiters();
-    this.publishPlaybookState({ state: "running" });
   }
 
   async restart(script: TerminalDemoScript<Name, undefined>): Promise<void>;
@@ -227,8 +203,6 @@ export class PlaybookRuntime<Name extends string = string> {
   async close() {
     this.closed = true;
     this.generation += 1;
-    this.paused = false;
-    this.resolvePauseWaiters();
     await this.closePanes();
   }
 
@@ -397,14 +371,6 @@ export class PlaybookRuntime<Name extends string = string> {
       throw new Error("Playbook stopped");
     }
 
-    while (this.paused) {
-      await this.waitUntilResumed();
-
-      if (!this.isCurrent(generation)) {
-        throw new Error("Playbook stopped");
-      }
-    }
-
     if (action) {
       this.publishPlaybookState({ state: "running", action });
       this.options.onRecordingState?.({ state: "started", action });
@@ -417,24 +383,6 @@ export class PlaybookRuntime<Name extends string = string> {
 
   private publishPlaybookState(state: PlaybookState) {
     this.options.onPlaybookState?.(state);
-  }
-
-  private waitUntilResumed() {
-    if (!this.paused) {
-      return Promise.resolve();
-    }
-
-    return new Promise<void>((resolve) => {
-      this.resumeWaiters.add(resolve);
-    });
-  }
-
-  private resolvePauseWaiters() {
-    const waiters = [...this.resumeWaiters];
-    this.resumeWaiters.clear();
-    for (const resolve of waiters) {
-      resolve();
-    }
   }
 
   private async runWithHiddenPaneOutput<T>(task: () => T | Promise<T>) {

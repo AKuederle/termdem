@@ -1,4 +1,4 @@
-# Preview Controls, Pause/Resume, and Restart Reset Plan
+# Preview Controls and Restart Reset Plan
 
 ## Goal
 
@@ -8,13 +8,12 @@ Improve preview playback controls and make restart a full reset across the backe
 
 1. Preview controls expose real playbook state instead of socket-only state.
 2. The controls use compact icon buttons with accessible labels, disabled states, active states, and click feedback.
-3. Pause and resume are true runtime operations:
-   - pause does not cancel the active run;
-   - resume continues the same run generation;
-   - stop still cancels the active generation;
-   - restart cancels, disposes, clears, and starts a fresh generation.
-4. Paused time does not count toward `api.wait()` delays.
-5. Pause checkpoints apply to script actions and long visible typing paths.
+3. The overlay exposes exactly three controls:
+   - stop cancels the active generation;
+   - replay cancels, disposes, clears, and starts a fresh generation;
+   - close hides the overlay.
+4. Runtime checkpoints keep stop/restart cancellation responsive during waits and visible typing.
+5. Pause/resume is intentionally unsupported.
 6. Restart fully resets backend state:
    - closes PTYs;
    - disposes terminal workspaces;
@@ -32,26 +31,24 @@ Improve preview playback controls and make restart a full reset across the backe
 - Add this plan document.
 - Commit it before implementation changes.
 
-### Slice 2: Runtime Pause/Resume State
+### Slice 2: Runtime Cancellation State
 
 Red:
 
-- Add runtime tests proving `pause()` blocks `api.wait()` without consuming active delay time.
-- Add runtime tests proving `resume()` continues the same run and `stop()` cancels a paused run.
+- Add runtime tests proving `stop()` cancels the active run.
+- Add runtime tests proving resize requests during restart do not prevent replay.
 
 Green:
 
-- Add `paused` to `PlaybookState`.
-- Add `pause()` and `resume()` methods to `PlaybookRuntime`.
-- Keep `generation` unchanged for pause/resume.
-- Wake paused waiters on resume, stop, restart, and close.
-- Make `ensureActive()` wait while paused and re-check generation after waking.
+- Keep `generation` as the cancellation token.
+- Keep stop/restart as generation-changing operations.
+- Store pane sizes across restart so frontend remount resize messages are not fatal.
 
-### Slice 3: Pause Checkpoints in Visible Pane Operations
+### Slice 3: Cancellation Checkpoints in Visible Pane Operations
 
 Red:
 
-- Add tests proving a visible typed action can pause mid-action and resume.
+- Add tests proving visible typed actions respect stop/restart checkpoints.
 
 Green:
 
@@ -62,14 +59,12 @@ Green:
 
 Red:
 
-- Add protocol tests for `playbook.pause`, `playbook.resume`, `preview.reset`, and `playbook.state: "paused"`.
+- Add protocol tests for `preview.reset` and the supported playbook control messages.
 - Add server-facing tests or focused helper tests for restart buffer clearing.
 
 Green:
 
 - Add `preview.reset` server-to-browser message.
-- Route `playbook.pause` to `runtime.pause()`.
-- Route `playbook.resume` to `runtime.resume()`.
 - Keep `playbook.start` as run start and `playbook.stop` as cancellation.
 - Clear backend replay buffers and latest pane messages during restart before new output is generated.
 
@@ -90,11 +85,11 @@ Green:
 
 Red:
 
-- Add tests for control view-model behavior: disabled states, active play/pause state, and pending command feedback.
+- Add tests for control view-model behavior: disabled states and pending command feedback.
 
 Green:
 
-- Replace text controls with icon buttons.
+- Replace text controls with stop, replay, and close icon buttons.
 - Add accessible labels and titles.
 - Add pressed/pending/active visual states.
 - Disable controls when the socket is unavailable or a conflicting command is pending.

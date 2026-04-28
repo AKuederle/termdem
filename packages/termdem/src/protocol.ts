@@ -12,12 +12,7 @@ export type PaneResizeMessage = {
 };
 
 export type PlaybookControlMessage = {
-  type:
-    | "playbook.start"
-    | "playbook.pause"
-    | "playbook.resume"
-    | "playbook.restart"
-    | "playbook.stop";
+  type: "playbook.start" | "playbook.restart" | "playbook.stop";
 };
 
 export type BrowserToServerMessage = PaneInputMessage | PaneResizeMessage | PlaybookControlMessage;
@@ -45,7 +40,7 @@ export type PaneStatusMessage = {
 
 export type PlaybookStateMessage = {
   type: "playbook.state";
-  state: "idle" | "running" | "paused" | "stopped" | "done" | "error";
+  state: "idle" | "running" | "stopped" | "done" | "error";
   action?: string;
   error?: string;
 };
@@ -102,8 +97,6 @@ export function parseBrowserToServerMessage(raw: string): BrowserToServerMessage
         rows: payload.rows,
       };
     case "playbook.start":
-    case "playbook.pause":
-    case "playbook.resume":
     case "playbook.restart":
     case "playbook.stop":
       return { type: payload.type };
@@ -212,7 +205,6 @@ function isPlaybookState(value: unknown) {
   return (
     value === "idle" ||
     value === "running" ||
-    value === "paused" ||
     value === "stopped" ||
     value === "done" ||
     value === "error"

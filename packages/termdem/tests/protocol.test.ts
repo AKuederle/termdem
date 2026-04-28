@@ -37,12 +37,14 @@ test("parseBrowserToServerMessage accepts playbook controls and rejects browser 
   expect(parseBrowserToServerMessage(JSON.stringify({ type: "playbook.start" }))).toEqual({
     type: "playbook.start",
   });
-  expect(parseBrowserToServerMessage(JSON.stringify({ type: "playbook.pause" }))).toEqual({
-    type: "playbook.pause",
+  expect(parseBrowserToServerMessage(JSON.stringify({ type: "playbook.restart" }))).toEqual({
+    type: "playbook.restart",
   });
-  expect(parseBrowserToServerMessage(JSON.stringify({ type: "playbook.resume" }))).toEqual({
-    type: "playbook.resume",
+  expect(parseBrowserToServerMessage(JSON.stringify({ type: "playbook.stop" }))).toEqual({
+    type: "playbook.stop",
   });
+  expect(parseBrowserToServerMessage(JSON.stringify({ type: "playbook.pause" }))).toBeNull();
+  expect(parseBrowserToServerMessage(JSON.stringify({ type: "playbook.resume" }))).toBeNull();
 
   expect(
     parseBrowserToServerMessage(
@@ -100,14 +102,15 @@ test("parseServerToBrowserMessage accepts pane, playbook, recording, and preview
     parseServerToBrowserMessage(
       JSON.stringify({
         type: "playbook.state",
-        state: "paused",
+        state: "running",
+        action: "waitFor(listener ready)",
       }),
     ),
   ).toEqual({
     type: "playbook.state",
-    state: "paused",
+    state: "running",
+    action: "waitFor(listener ready)",
     error: undefined,
-    action: undefined,
   });
 
   expect(

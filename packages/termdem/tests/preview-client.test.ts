@@ -70,7 +70,7 @@ test("preview client state tracks playbook state and reset generation", () => {
   expect(reset.resetGeneration).toBe(1);
 });
 
-test("preview controls derive disabled, active, and pending states", () => {
+test("preview controls derive disabled and pending states", () => {
   expect(
     previewControlViewState({
       pendingCommand: undefined,
@@ -78,10 +78,6 @@ test("preview controls derive disabled, active, and pending states", () => {
       socketStatus: "open",
     }),
   ).toMatchObject({
-    pauseActive: false,
-    pauseDisabled: false,
-    playActive: true,
-    playDisabled: true,
     restartDisabled: false,
     stopDisabled: false,
   });
@@ -89,13 +85,11 @@ test("preview controls derive disabled, active, and pending states", () => {
   expect(
     previewControlViewState({
       pendingCommand: "restart",
-      playbookState: "paused",
+      playbookState: "running",
       socketStatus: "open",
     }),
   ).toMatchObject({
     pendingCommand: "restart",
-    pauseActive: true,
-    playDisabled: true,
     restartDisabled: true,
     stopDisabled: true,
   });
@@ -107,8 +101,6 @@ test("preview controls derive disabled, active, and pending states", () => {
       socketStatus: "closed",
     }),
   ).toMatchObject({
-    pauseDisabled: true,
-    playDisabled: true,
     restartDisabled: true,
     stopDisabled: true,
   });

@@ -210,63 +210,6 @@ test("playbook runtime cancellation prevents stale playbook completion", async (
   expect(states).not.toContain("done");
 });
 
-test("playbook runtime pause blocks wait until resume without cancelling the run", async () => {
-  const states: string[] = [];
-  const runtime = new PlaybookRuntime({
-    onPlaybookState(state) {
-      states.push(state.state);
-    },
-    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
-    typeDelayMs: 0,
-  });
-  let completed = false;
-
-  const run = runtime.run(async (api) => {
-    await api.wait(50);
-    completed = true;
-  });
-
-  await waitFor(() => states.includes("running"));
-  runtime.pause();
-  await sleep(100);
-
-  expect(completed).toBe(false);
-  expect(states).toContain("paused");
-
-  runtime.resume();
-  await run;
-
-  expect(completed).toBe(true);
-  expect(states.at(-1)).toBe("done");
-});
-
-test("playbook runtime stop cancels a paused run", async () => {
-  const states: string[] = [];
-  const runtime = new PlaybookRuntime({
-    onPlaybookState(state) {
-      states.push(state.state);
-    },
-    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
-    typeDelayMs: 0,
-  });
-  let completed = false;
-
-  const run = runtime.run(async (api) => {
-    await api.wait(5_000);
-    completed = true;
-  });
-
-  await waitFor(() => states.includes("running"));
-  runtime.pause();
-  await waitFor(() => states.includes("paused"));
-  runtime.stop();
-  await run;
-
-  expect(completed).toBe(false);
-  expect(states).toContain("stopped");
-  expect(states).not.toContain("done");
-});
-
 test("playbook runtime keeps pane resize requests made during restart", async () => {
   const states: string[] = [];
   const runtime = new PlaybookRuntime({
@@ -288,39 +231,6 @@ test("playbook runtime keeps pane resize requests made during restart", async ()
   await first;
   await restart;
 
-  expect(states.at(-1)).toBe("done");
-});
-
-test("playbook runtime pause can stop and resume visible typing mid-action", async () => {
-  const visibleOutput: string[] = [];
-  const states: string[] = [];
-  const runtime = new PlaybookRuntime({
-    onPaneOutput(message) {
-      visibleOutput.push(message.data);
-    },
-    onPlaybookState(state) {
-      states.push(state.state);
-    },
-    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
-    typeDelayMs: 20,
-  });
-
-  const run = runtime.run(async (api) => {
-    await api.pane("main").type("abcdef");
-  });
-
-  await waitFor(() => visibleOutput.join("").includes("a"));
-  runtime.pause();
-  const pausedTranscript = visibleOutput.join("");
-  await sleep(100);
-
-  expect(visibleOutput.join("")).toBe(pausedTranscript);
-  expect(states).toContain("paused");
-
-  runtime.resume();
-  await run;
-
-  expect(visibleOutput.join("")).toContain("abcdef");
   expect(states.at(-1)).toBe("done");
 });
 
