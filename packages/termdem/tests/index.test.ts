@@ -3,7 +3,15 @@ import { tmpdir } from "node:os";
 import { stripVTControlCharacters } from "node:util";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vite-plus/test";
-import { Dir, execNode, ExecNodeError, keys, quoteShellArg, TmpDir } from "../src/index.ts";
+import {
+  Dir,
+  execNode,
+  ExecNodeError,
+  keys,
+  quoteShellArg,
+  TmpDir,
+  typingDelays,
+} from "../src/index.ts";
 import { normalizeExecCapture } from "../src/normalize.ts";
 import { createPaneSession } from "../src/pane-session.ts";
 import { resolveRecordingConfig } from "../src/recording-config.ts";
@@ -117,7 +125,7 @@ test("pane sessions can chain exec results from ls into cat", async () => {
 
   try {
     const listing = await session.exec("command ls -1 --color=never", {
-      typeDelayMs: 1,
+      typeDelayMs: 0,
     });
 
     expect(listing.lines[0]).toBe("alpha.txt");
@@ -125,7 +133,7 @@ test("pane sessions can chain exec results from ls into cat", async () => {
 
     const firstFile = listing.lines[0];
     const content = await session.exec(`cat '${firstFile}'`, {
-      typeDelayMs: 1,
+      typeDelayMs: 0,
     });
 
     expect(content.exitCode).toBe(0);
@@ -152,14 +160,15 @@ test("pane sessions disable pagers so exec commands can complete in a tty", asyn
   const session = await createPaneSession({ cwd });
 
   try {
-    await session.exec("git init");
+    await session.exec("git init", { typeDelayMs: 0 });
     await session.exec(
       "git config user.name 'termdem' && git config user.email 'demo@example.test'",
+      { typeDelayMs: 0 },
     );
     await writeFile(join(cwd, "README.md"), "hello\n", "utf8");
-    await session.exec("git add README.md && git commit -m init");
+    await session.exec("git add README.md && git commit -m init", { typeDelayMs: 0 });
 
-    const log = await withTimeout(session.exec("git log --oneline -1"), 1_000);
+    const log = await withTimeout(session.exec("git log --oneline -1", { typeDelayMs: 0 }), 1_000);
 
     expect(log.lines[0]).toContain("init");
     expect(log.raw).not.toContain("pager blocked");
@@ -183,12 +192,14 @@ test("pane sessions do not fake echo input while an alternate-screen app is acti
   });
 
   try {
-    await session.type("printf '\\033[?1049h'; read -rsn 1; printf 'app received\\033[?1049l'");
+    await session.type("printf '\\033[?1049h'; read -rsn 1; printf 'app received\\033[?1049l'", {
+      typeDelayMs: 0,
+    });
     await session.press("Enter");
     await waitFor(() => visibleOutput.join("").includes("\x1b[?1049h"));
 
     visibleOutput.length = 0;
-    await session.type("x");
+    await session.type("x", { typeDelayMs: 0 });
     await waitFor(() => visibleOutput.join("").includes("app received"));
 
     const transcript = stripVTControlCharacters(visibleOutput.join(""));
@@ -212,6 +223,13 @@ test("keys exposes common raw terminal input sequences", () => {
   expect(keys.TAB).toBe("\t");
   expect(keys.ARROW_UP).toBe("\x1b[A");
   expect(keys.CTRL_C).toBe("\x03");
+});
+
+test("typingDelays exposes common typing speeds as per-character delays", () => {
+  expect(typingDelays.WPM_30).toBe(400);
+  expect(typingDelays.WPM_60).toBe(200);
+  expect(typingDelays.WPM_80).toBe(150);
+  expect(typingDelays.WPM_120).toBe(100);
 });
 
 test("execNode executes a Node script and captures output", async () => {

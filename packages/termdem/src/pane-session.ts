@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { stripVTControlCharacters } from "node:util";
 import { spawn, type IPty } from "node-pty";
 import { normalizeExecCapture } from "./normalize.ts";
+import { typingDelays } from "./typing-delays.ts";
 import type { ExecOptions, ExecResult, PaneController, PressKey, TypeOptions } from "./types.ts";
 
 export type PaneSessionOptions = {
@@ -151,7 +152,7 @@ class NodePtyPaneSession implements PaneSession {
     for (const char of text) {
       this.emitInputVisible(char);
       this.pty.write(char);
-      await sleep(options.typeDelayMs ?? 0);
+      await sleep(options.typeDelayMs ?? typingDelays.WPM_60);
     }
   }
 

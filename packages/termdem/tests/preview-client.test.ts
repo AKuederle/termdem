@@ -17,10 +17,12 @@ test("pane frame data attributes expose pane identity and presence-style current
 test("playbook pane actions mark the current pane without clearing it during waits", async () => {
   const currentPanes: string[] = [];
   const actions: string[] = [];
+  const typeDelays: Array<number | undefined> = [];
   const runtime: PaneController & { ready: boolean } = {
     ready: true,
-    async exec(command) {
+    async exec(command, options) {
       actions.push(`exec:${command}`);
+      typeDelays.push(options?.typeDelayMs);
       return {
         command,
         endedAt: 2,
@@ -34,8 +36,9 @@ test("playbook pane actions mark the current pane without clearing it during wai
     async press(key) {
       actions.push(`press:${key}`);
     },
-    async type(text) {
+    async type(text, options) {
       actions.push(`type:${text}`);
+      typeDelays.push(options?.typeDelayMs);
     },
   };
 
@@ -45,13 +48,16 @@ test("playbook pane actions mark the current pane without clearing it during wai
     (paneName) => {
       currentPanes.push(paneName);
     },
+    100,
   );
 
   const server = api.pane("server");
   await server.type("npm test");
+  await server.exec("npm test", { typeDelayMs: 25 });
   await api.wait(10);
   await server.press("Enter");
 
-  expect(actions).toEqual(["type:npm test", "press:Enter"]);
-  expect(currentPanes).toEqual(["server", "server"]);
+  expect(actions).toEqual(["type:npm test", "exec:npm test", "press:Enter"]);
+  expect(currentPanes).toEqual(["server", "server", "server"]);
+  expect(typeDelays).toEqual([100, 25]);
 });

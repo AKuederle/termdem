@@ -3,6 +3,7 @@ import {
   createTerminalDemo,
   execNode,
   quoteShellArg,
+  typingDelays,
   type TerminalPaneComponents,
 } from "@akuederle/termdem";
 
@@ -31,28 +32,23 @@ const demo = createTerminalDemo(
     const listener = api.pane("listener");
     const sender = api.pane("sender");
 
-    const setup = await server.exec("node scripts/server.mjs setup", { typeDelayMs: 22 });
+    const setup = await server.exec("node scripts/server.mjs setup");
     const url = parseChatUrl(setup.text);
 
-    await listener.type(`node scripts/client.mjs listen ${quoteShellArg(url)}`, {
-      typeDelayMs: 18,
-    });
+    await listener.type(`node scripts/client.mjs listen ${quoteShellArg(url)}`);
     await listener.press("Enter");
 
     await sender.exec(
       `node scripts/client.mjs send ${quoteShellArg(url)} ${quoteShellArg("hello")}`,
-      {
-        typeDelayMs: 18,
-      },
     );
     await sender.exec(
       `node scripts/client.mjs send ${quoteShellArg(url)} ${quoteShellArg("message from sender pane")}`,
-      { typeDelayMs: 18 },
     );
-    await server.exec("node scripts/server.mjs status", { typeDelayMs: 18 });
+    await server.exec("node scripts/server.mjs status");
   },
   {
     size: { width: 1920, height: 1080 },
+    typeDelayMs: typingDelays.WPM_120,
     viewportSize: { width: 1440, height: 810 },
   },
 );

@@ -5,6 +5,7 @@ export type DemoSize = {
 
 export type RecordingConfig = {
   size?: DemoSize;
+  typeDelayMs?: number;
   viewportSize?: DemoSize;
 };
 

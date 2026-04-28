@@ -562,7 +562,12 @@ function previewEntrySource(demoPath: string) {
 import demo, { render } from ${JSON.stringify(`/@fs/${toVitePath(demoPath)}`)};
 import { renderPreviewApp } from "@akuederle/termdem/preview-client";
 
-renderPreviewApp({ render, script: demo.script, terminalDefinitions: demo.terminalDefinitions });
+renderPreviewApp({
+  config: demo.config,
+  render,
+  script: demo.script,
+  terminalDefinitions: demo.terminalDefinitions,
+});
 `;
 }
 
@@ -585,6 +590,13 @@ export function clientShimSource() {
   PAGE_UP: "\\x1b[5~",
   SHIFT_TAB: "\\x1b[Z",
   TAB: "\\t",
+};
+
+export const typingDelays = {
+  WPM_30: 400,
+  WPM_60: 200,
+  WPM_80: 150,
+  WPM_120: 100,
 };
 
 export class Dir {

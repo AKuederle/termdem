@@ -1,4 +1,10 @@
-import { TmpDir, createTerminalDemo, keys, type TerminalPaneComponents } from "@akuederle/termdem";
+import {
+  TmpDir,
+  createTerminalDemo,
+  keys,
+  typingDelays,
+  type TerminalPaneComponents,
+} from "@akuederle/termdem";
 
 const VIM = "vim -Nu NONE -n -i NONE";
 
@@ -18,39 +24,36 @@ const demo = createTerminalDemo(
   async (api) => {
     const git = api.pane("git");
 
-    await git.exec("git init", { typeDelayMs: 22 });
-    await git.exec("git config user.name 'termdem' && git config user.email 'demo@example.test'", {
-      typeDelayMs: 12,
-    });
+    await git.exec("git init");
+    await git.exec("git config user.name 'termdem' && git config user.email 'demo@example.test'");
 
-    await git.type(`${VIM} README.md`, { typeDelayMs: 24 });
+    await git.type(`${VIM} README.md`);
     await git.press(keys.ENTER);
     await api.wait(600);
-    await git.type("i# termdem git demo\n\nCreated from raw Vim keystrokes.\n", {
-      typeDelayMs: 18,
-    });
+    await git.type("i# termdem git demo\n\nCreated from raw Vim keystrokes.\n");
     await git.type(keys.ESC);
     await api.wait(100);
-    await git.type(":wq", { typeDelayMs: 28 });
+    await git.type(":wq");
     await git.press(keys.ENTER);
     await api.wait(600);
 
-    await git.type(`${VIM} README.md`, { typeDelayMs: 24 });
+    await git.type(`${VIM} README.md`);
     await git.press(keys.ENTER);
     await api.wait(600);
-    await git.type("Go\nEdited in a second Vim session.\n", { typeDelayMs: 18 });
+    await git.type("Go\nEdited in a second Vim session.\n");
     await git.type(keys.ESC);
     await api.wait(100);
-    await git.type(":wq", { typeDelayMs: 28 });
+    await git.type(":wq");
     await git.press(keys.ENTER);
     await api.wait(600);
 
-    await git.exec("git add README.md", { typeDelayMs: 20 });
-    await git.exec("git commit -m 'Create README through vim'", { typeDelayMs: 20 });
-    await git.exec("git log --oneline --decorate --stat -1", { typeDelayMs: 16 });
+    await git.exec("git add README.md");
+    await git.exec("git commit -m 'Create README through vim'");
+    await git.exec("git log --oneline --decorate --stat -1");
   },
   {
     size: { width: 1280, height: 720 },
+    typeDelayMs: typingDelays.WPM_120,
   },
 );
 

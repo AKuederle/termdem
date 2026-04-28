@@ -13,12 +13,15 @@ import { Terminal, useTerminal } from "@wterm/react";
 import "@wterm/react/css";
 import { waitForPlaybookDelay } from "./playbook-wait.ts";
 import { parsePaneServerMessage, type PaneClientMessage } from "./protocol.ts";
+import type { RecordingConfig } from "./recording-config.ts";
 import type { TerminalPaneComponent, TerminalPaneProps } from "./terminal-demo.ts";
+import { typingDelays } from "./typing-delays.ts";
 import type { ExecResult, PaneController, PressKey, TypeOptions } from "./types.ts";
 
 type PreviewMode = "running" | "stopped";
 
 type PreviewDemoModule = {
+  config: RecordingConfig;
   render: (panes: Record<string, TerminalPaneComponent>) => ReactNode;
   script?: (api: {
     pane(name: string): PaneController;
@@ -207,6 +210,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
           paneRuntimesRef.current,
           () => waitForPlaybookActive(runId),
           setCurrentPaneName,
+          demo.config.typeDelayMs,
         ),
       );
       if (runId === playbookRunIdRef.current) {
@@ -636,7 +640,13 @@ export function createPlaybookApi(
   runtimes: Map<string, ReadyPaneRuntime>,
   waitForPlaybookActive: () => Promise<void>,
   setCurrentPaneName: (name: string) => void,
+  defaultTypeDelayMs: number = typingDelays.WPM_60,
 ) {
+  const withDefaultTypeDelay = (options?: TypeOptions) => ({
+    ...options,
+    typeDelayMs: options?.typeDelayMs ?? defaultTypeDelayMs,
+  });
+
   return {
     async wait(delayMs: number) {
       await runPaneAction(`wait(${delayMs})`, async () => {
@@ -656,7 +666,7 @@ export function createPlaybookApi(
           return runPaneAction(
             `pane(${JSON.stringify(name)}).exec(${JSON.stringify(command)})`,
             async () => {
-              const result = await runtime.exec(command, options);
+              const result = await runtime.exec(command, withDefaultTypeDelay(options));
               await waitForPlaybookActive();
               return result;
             },
@@ -679,7 +689,7 @@ export function createPlaybookApi(
           await runPaneAction(
             `pane(${JSON.stringify(name)}).type(${summarizeText(text)})`,
             async () => {
-              await runtime.type(text, options);
+              await runtime.type(text, withDefaultTypeDelay(options));
               await waitForPlaybookActive();
             },
           );

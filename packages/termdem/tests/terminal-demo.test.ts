@@ -20,6 +20,7 @@ test("createTerminalDemo preserves backend terminal definitions and config", () 
     script,
     {
       size: { width: 1920, height: 1080 },
+      typeDelayMs: 100,
       viewportSize: { width: 1440, height: 900 },
     },
   );
@@ -28,6 +29,7 @@ test("createTerminalDemo preserves backend terminal definitions and config", () 
   expect(demo.script).toBe(script);
   expect(demo.config).toEqual({
     size: { width: 1920, height: 1080 },
+    typeDelayMs: 100,
     viewportSize: { width: 1440, height: 900 },
   });
 });
@@ -56,5 +58,7 @@ test("client shim exports browser-safe public demo helpers", () => {
 
   expect(source).toContain("export const keys");
   expect(source).toContain('ESC: "\\x1b"');
+  expect(source).toContain("export const typingDelays");
+  expect(source).toContain("WPM_120: 100");
   expect(source).not.toContain('export { keys } from "@akuederle/termdem"');
 });
