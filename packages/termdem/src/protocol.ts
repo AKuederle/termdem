@@ -45,7 +45,7 @@ export type PaneStatusMessage = {
 
 export type PlaybookStateMessage = {
   type: "playbook.state";
-  state: "idle" | "running" | "stopped" | "done" | "error";
+  state: "idle" | "running" | "paused" | "stopped" | "done" | "error";
   action?: string;
   error?: string;
 };
@@ -62,12 +62,17 @@ export type PreviewErrorMessage = {
   message: string;
 };
 
+export type PreviewResetMessage = {
+  type: "preview.reset";
+};
+
 export type ServerToBrowserMessage =
   | PaneMetaMessage
   | PaneOutputMessage
   | PaneStatusMessage
   | PlaybookStateMessage
   | RecordingStateMessage
+  | PreviewResetMessage
   | PreviewErrorMessage;
 
 export function parseBrowserToServerMessage(raw: string): BrowserToServerMessage | null {
@@ -173,6 +178,8 @@ export function parseServerToBrowserMessage(raw: string): ServerToBrowserMessage
         return null;
       }
       return { type: "preview.error", message: payload.message };
+    case "preview.reset":
+      return { type: "preview.reset" };
     default:
       return null;
   }
@@ -205,6 +212,7 @@ function isPlaybookState(value: unknown) {
   return (
     value === "idle" ||
     value === "running" ||
+    value === "paused" ||
     value === "stopped" ||
     value === "done" ||
     value === "error"

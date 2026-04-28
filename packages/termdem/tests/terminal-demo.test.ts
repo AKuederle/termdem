@@ -1,6 +1,10 @@
 import { expect, test } from "vite-plus/test";
 import { createTerminalDemo, TmpDir } from "../src/index.ts";
-import { clientShimSource, previewEntrySource } from "../src/preview-server.ts";
+import {
+  clientShimSource,
+  previewEntrySource,
+  resetPreviewReplayState,
+} from "../src/preview-server.ts";
 
 test("createTerminalDemo preserves backend terminal definitions and config", () => {
   const dir = new TmpDir({});
@@ -97,4 +101,22 @@ test("preview entry imports demo through a named export", () => {
   expect(source).not.toContain("terminalDefinitions");
   expect(source).not.toContain("config: demo.config");
   expect(source).not.toContain("import demo");
+});
+
+test("preview replay reset clears stale pane state and output buffers", () => {
+  const latestMessages = new Map([
+    [
+      "pane.meta:main",
+      { type: "pane.meta" as const, pane: "main", shell: "/bin/bash", cwd: "/tmp", prompt: "$ " },
+    ],
+    ["pane.status:main", { type: "pane.status" as const, pane: "main", status: "ready" as const }],
+    ["playbook.state", { type: "playbook.state" as const, state: "done" as const }],
+    ["recording.state", { type: "recording.state" as const, state: "done" as const }],
+  ]);
+  const paneOutputBuffers = new Map([["main", "old transcript"]]);
+
+  resetPreviewReplayState(latestMessages, paneOutputBuffers);
+
+  expect(paneOutputBuffers.size).toBe(0);
+  expect([...latestMessages.keys()]).toEqual(["playbook.state", "recording.state"]);
 });

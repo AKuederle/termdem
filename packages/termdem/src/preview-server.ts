@@ -297,7 +297,16 @@ async function wirePreviewClient({
 
   ws.on("message", (message) => {
     void runtimeReady
-      .then(({ demo, runtime }) => handleBrowserMessage(demo, runtime, rawDataToString(message)))
+      .then(({ demo, runtime }) =>
+        handleBrowserMessage({
+          broadcast,
+          demo,
+          latestMessages,
+          paneOutputBuffers,
+          rawMessage: rawDataToString(message),
+          runtime,
+        }),
+      )
       .catch(fail);
   });
 
@@ -308,11 +317,21 @@ async function wirePreviewClient({
   }
 }
 
-async function handleBrowserMessage(
-  demo: PreviewDemoModule,
-  runtime: PlaybookRuntime,
-  rawMessage: string,
-) {
+async function handleBrowserMessage({
+  broadcast,
+  demo,
+  latestMessages,
+  paneOutputBuffers,
+  rawMessage,
+  runtime,
+}: {
+  broadcast: (message: ServerToBrowserMessage) => void;
+  demo: PreviewDemoModule;
+  latestMessages: Map<string, ServerToBrowserMessage>;
+  paneOutputBuffers: Map<string, string>;
+  rawMessage: string;
+  runtime: PlaybookRuntime;
+}) {
   const parsed = parseBrowserToServerMessage(rawMessage);
   if (!parsed) {
     return;
@@ -326,17 +345,23 @@ async function handleBrowserMessage(
       await runtime.resizePane(parsed.pane, parsed.cols, parsed.rows);
       return;
     case "playbook.start":
-    case "playbook.resume":
       if (demo.script) {
         await runtime.run(demo.script, { setup: demo.setup, teardown: demo.teardown });
       }
       return;
+    case "playbook.resume":
+      runtime.resume();
+      return;
     case "playbook.pause":
+      runtime.pause();
+      return;
     case "playbook.stop":
       runtime.stop();
       return;
     case "playbook.restart":
       if (demo.script) {
+        resetPreviewReplayState(latestMessages, paneOutputBuffers);
+        broadcast({ type: "preview.reset" });
         await runtime.restart(demo.script, { setup: demo.setup, teardown: demo.teardown });
       }
       return;
@@ -404,9 +429,22 @@ function rememberLatestMessage(
       return;
     case "pane.output":
     case "preview.error":
+    case "preview.reset":
       return;
     default:
       message satisfies never;
+  }
+}
+
+export function resetPreviewReplayState(
+  latestMessages: Map<string, ServerToBrowserMessage>,
+  paneOutputBuffers: Map<string, string>,
+) {
+  paneOutputBuffers.clear();
+  for (const key of latestMessages.keys()) {
+    if (key.startsWith("pane.")) {
+      latestMessages.delete(key);
+    }
   }
 }
 
