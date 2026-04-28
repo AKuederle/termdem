@@ -21,36 +21,29 @@ npm install @akuederle/termdem
 
 ## Usage
 
-We assume, the terminal app you want to demo is written in JS/TS and you already have a JS project for this library (we will cover standalone usage later).
+Termdem works best when the terminal app you want to demo already lives in a JavaScript or TypeScript project.
+Create one `.tsx` file per demo, export the `demo` returned by `createTerminalDemo`, and export a `render` function that lays out the terminal panes.
 
 1. Add `@akuederle/termdem` to your dev dependencies.
-2. Create a folder where you want to place your demos. Each demo will be a single file, but it can import from other files using normal JS imports.
-3. Create your first demo as `.tsx` file.
+2. Create a folder for your demos.
+3. Add a `.tsx` demo file.
+4. Configure panes, write the script, and render the scene.
 
-A demo file needs to export a `demo` object that is returned by `createTerminalDemo` and a render function that takes a set of terminal components as props and returns a react scene.
-You have built-in access for [tailwind@v4]() to style the scene.
+### Create a Scene
 
-A minimal scene with two panes looks like this.
+Panes define the terminals that the script can control and the render function can display.
+The render function receives one React component per pane, keyed by pane name.
+Tailwind v4 is available in demo files, so regular utility classes are enough for most layouts.
 
-```ts
-import {
-  TmpDir,
-  createTerminalDemo,
-  type TerminalPaneComponents,
-} from "@akuederle/termdem";
+```tsx
+import { TmpDir, createTerminalDemo, type TerminalPaneComponents } from "@akuederle/termdem";
 
 const workspace = new TmpDir({});
 
 export const demo = createTerminalDemo({
   panes: [
-    {
-      name: "pane1",
-      pwd: workspace,
-    },
-    {
-      name: "pane2",
-      pwd: workspace,
-    },
+    { name: "server", pwd: workspace },
+    { name: "client", pwd: workspace },
   ],
   script: async () => {},
   settings: {
@@ -61,12 +54,61 @@ export const demo = createTerminalDemo({
 export function render(panes: TerminalPaneComponents<typeof demo>) {
   return (
     <main className="grid h-full w-full min-h-0 grid-cols-2 grid-rows-1 gap-px bg-[#333] p-px">
-      <panes.pane1 className="min-h-0 min-w-0" />
-      <panes.pane2 className="min-h-0 min-w-0" />
+      <panes.server className="min-h-0 min-w-0" />
+      <panes.client className="min-h-0 min-w-0" />
     </main>
   );
 }
 ```
+
+### Create a Script
+
+The script is an async function that receives an `api` object.
+Use `api.pane(name)` to select a pane and then drive it with `exec`, `sendLine`, `type`, and `press`.
+Use normal JavaScript between terminal actions whenever you need to parse output or decide the next command.
+
+```ts
+import { quoteShellArg } from "@akuederle/termdem";
+
+export const demo = createTerminalDemo({
+  panes: [
+    { name: "server", pwd: workspace },
+    { name: "client", pwd: workspace },
+  ],
+  script: async (api) => {
+    const server = api.pane("server");
+    const client = api.pane("client");
+
+    const setup = await server.exec("node scripts/server.mjs setup");
+    const url = setup.lines.find((line) => line.startsWith("URL="))?.slice("URL=".length);
+
+    if (!url) {
+      throw new Error("Server did not print a URL");
+    }
+
+    await server.sendLine(`node scripts/server.mjs listen ${quoteShellArg(url)}`);
+    await api.waitFor("server ready", async () => {
+      const result = await api.node.exec("curl", ["-fsS", url], {
+        reject: false,
+        timeoutMs: 1000,
+      });
+
+      return result.exitCode === 0;
+    });
+
+    await client.exec(`node scripts/client.mjs ${quoteShellArg(url)}`);
+  },
+});
+```
+
+The pane API is for visible terminal work.
+Use `exec` for commands that should finish, `sendLine` for long-running processes, `type` for raw text input, and `press` for single keys or key combinations such as `keys.CTRL_C` and `keys.ESC`.
+
+The top-level API is for orchestration.
+Use `wait` for fixed delays, `waitFor` for readiness checks, and `node.exec` for hidden Node-side subprocesses that should not appear in the terminal.
+
+See the full [socket CLI example](./examples/socket-cli/demo.tsx) for a multi-pane server/client demo.
+See the full [Git/Vim example](./examples/git-vim/demo.tsx) for an interactive full-screen terminal app demo.
 
 ## Tips
 
