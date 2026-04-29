@@ -13,24 +13,25 @@ jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/playwright:v1.59.1-noble
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install native build dependencies
-        run: apt-get update && apt-get install -y build-essential
-
-      - name: Set up Vite+
-        uses: voidzero-dev/setup-vp@v1
-        with:
-          node-version: "22"
-          cache: true
-
       - name: Set up pnpm
-        run: npm install --global pnpm@10.33.1
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Check release tag matches package version
         run: |
@@ -42,8 +43,17 @@ jobs:
           fi
 
       - name: Build package
-        run: vp run @akuederle/termdem#build
+        run: pnpm --filter @akuederle/termdem build
 
       - name: Publish package
-        working-directory: packages/termdem
-        run: pnpm publish --access public --provenance --no-git-checks
+        run: |
+          VERSION="$(node -p "require('./packages/termdem/package.json').version")"
+          REGISTRY_VERSION="$(npm view @akuederle/termdem version 2>/dev/null || echo "0.0.0")"
+
+          if [ "$VERSION" = "$REGISTRY_VERSION" ]; then
+            echo "@akuederle/termdem@$VERSION is already published, skipping"
+            exit 0
+          fi
+
+          TARBALL="$(cd packages/termdem && pnpm pack --pack-destination /tmp | tail -1)"
+          npm publish "$TARBALL" --provenance --access public
