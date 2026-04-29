@@ -11,11 +11,11 @@ import { typingDelays } from "./typing-delays.ts";
 import type {
   ExecOptions,
   ExecResult,
-  NodeExecOptions,
-  NodeExecResult,
   PaneController,
   PaneScreenSnapshot,
   PressKey,
+  SidecarExecOptions,
+  SidecarExecResult,
   TypeOptions,
   WaitForOptions,
 } from "./types.ts";
@@ -212,8 +212,8 @@ export class PlaybookRuntime<Name extends string = string> {
     } = {},
   ): TerminalDemoScriptApi<Name> {
     return {
-      node: {
-        exec: (file, args = [], options = {}) => execForPlaybook(file, args, options),
+      sidecar: {
+        exec: (file, args = [], options = {}) => execSidecar(file, args, options),
       },
       pane: (name) => this.createPaneController(String(name), generation, options),
       wait: async (delayMs) => {
@@ -403,11 +403,11 @@ export class PlaybookRuntime<Name extends string = string> {
   }
 }
 
-export function execForPlaybook(
+export function execSidecar(
   file: string,
   args: readonly string[] = [],
-  options: NodeExecOptions = {},
-): Promise<NodeExecResult> {
+  options: SidecarExecOptions = {},
+): Promise<SidecarExecResult> {
   return new Promise((resolve, reject) => {
     const child = execFile(
       file,

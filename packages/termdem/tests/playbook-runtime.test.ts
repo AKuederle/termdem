@@ -5,7 +5,7 @@ import { afterEach, expect, test } from "vite-plus/test";
 import { keys } from "../src/keys.ts";
 import { PlaybookRuntime } from "../src/playbook-runtime.ts";
 import { createPaneSession } from "../src/pane-session.ts";
-import type { NodeExecResult, PaneScreenSnapshot } from "../src/types.ts";
+import type { SidecarExecResult, PaneScreenSnapshot } from "../src/types.ts";
 import { TmpDir } from "../src/workspace.ts";
 
 const cleanupPaths: string[] = [];
@@ -59,22 +59,22 @@ test("node exec captures stdout, stderr, exit code, timeout, and reject behavior
     typeDelayMs: 0,
   });
   let rejectionMessage = "";
-  let result: NodeExecResult | undefined;
-  let timeoutResult: NodeExecResult | undefined;
+  let result: SidecarExecResult | undefined;
+  let timeoutResult: SidecarExecResult | undefined;
 
   await runtime.run(async (api) => {
     try {
-      await api.node.exec(process.execPath, [scriptPath, "7"], { cwd });
+      await api.sidecar.exec(process.execPath, [scriptPath, "7"], { cwd });
     } catch (error) {
       rejectionMessage = error instanceof Error ? error.message : String(error);
     }
 
-    result = await api.node.exec(process.execPath, [scriptPath, "7"], {
+    result = await api.sidecar.exec(process.execPath, [scriptPath, "7"], {
       cwd,
       reject: false,
     });
 
-    timeoutResult = await api.node.exec(process.execPath, [scriptPath, "0"], {
+    timeoutResult = await api.sidecar.exec(process.execPath, [scriptPath, "0"], {
       cwd,
       reject: false,
       timeoutMs: 1,

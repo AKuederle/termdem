@@ -60,9 +60,9 @@ test("createTerminalDemo scripts can wait without selecting a pane", async () =>
 
   await demo.script(
     {
-      node: {
+      sidecar: {
         async exec() {
-          throw new Error("node.exec should not be required for wait");
+          throw new Error("sidecar.exec should not be required for wait");
         },
       },
       pane() {

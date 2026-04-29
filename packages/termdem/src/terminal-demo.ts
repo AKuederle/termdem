@@ -1,9 +1,9 @@
 import type { CSSProperties, ReactElement } from "react";
 import { type RecordingConfig } from "./recording-config.ts";
 import {
-  type NodeExecOptions,
-  type NodeExecResult,
   type PaneController,
+  type SidecarExecOptions,
+  type SidecarExecResult,
   type WaitForOptions,
 } from "./types.ts";
 import { type TerminalWorkspaceDefinition } from "./workspace.ts";
@@ -83,7 +83,7 @@ type Awaitable<T> = T | Promise<T>;
  *
  * async function waitForServer(api: TerminalDemoScriptApi<"server" | "client">) {
  *   await api.waitFor("server is accepting requests", async () => {
- *     const result = await api.node.exec("curl", ["-fsS", "http://127.0.0.1:3000"], {
+ *     const result = await api.sidecar.exec("curl", ["-fsS", "http://127.0.0.1:3000"], {
  *       reject: false,
  *       timeoutMs: 1000,
  *     });
@@ -110,10 +110,10 @@ type Awaitable<T> = T | Promise<T>;
  */
 export type TerminalDemoScriptApi<Name extends string> = {
   /**
-   * Hidden Node-side helpers for setup, readiness checks, and other work that should
+   * Hidden sidecar helpers for setup, readiness checks, and other work that should
    * not be shown in a terminal pane.
    */
-  node: {
+  sidecar: {
     /**
      * Runs an executable as a hidden child process and returns its stdout, stderr, and exit code.
      *
@@ -127,7 +127,7 @@ export type TerminalDemoScriptApi<Name extends string> = {
      * @example
      * ```ts
      * await api.waitFor("server ready", async () => {
-     *   const result = await api.node.exec("curl", ["-fsS", "http://127.0.0.1:3000"], {
+     *   const result = await api.sidecar.exec("curl", ["-fsS", "http://127.0.0.1:3000"], {
      *     reject: false,
      *     timeoutMs: 1000,
      *   });
@@ -139,8 +139,8 @@ export type TerminalDemoScriptApi<Name extends string> = {
     exec(
       file: string,
       args?: readonly string[],
-      options?: NodeExecOptions,
-    ): Promise<NodeExecResult>;
+      options?: SidecarExecOptions,
+    ): Promise<SidecarExecResult>;
   };
 
   /**
@@ -179,7 +179,7 @@ export type TerminalDemoScriptApi<Name extends string> = {
    * @example
    * ```ts
    * await api.waitFor("API is accepting requests", async () => {
-   *   const result = await api.node.exec("curl", ["-fsS", "http://127.0.0.1:3000"], {
+   *   const result = await api.sidecar.exec("curl", ["-fsS", "http://127.0.0.1:3000"], {
    *     reject: false,
    *   });
    *

@@ -205,9 +205,9 @@ export interface HiddenPaneController {
 }
 
 /**
- * Options for `api.node.exec()`, which runs a hidden Node-side process.
+ * Options for `api.sidecar.exec()`, which runs a hidden sidecar process.
  */
-export type NodeExecOptions = {
+export type SidecarExecOptions = {
   /** Working directory for the child process. Defaults to the preview server process directory. */
   cwd?: string;
   /** Environment variables for the child process. Defaults to the preview server process environment. */
@@ -230,9 +230,9 @@ export type NodeExecOptions = {
 };
 
 /**
- * Result returned by `api.node.exec()`.
+ * Result returned by `api.sidecar.exec()`.
  */
-export type NodeExecResult = {
+export type SidecarExecResult = {
   /** Numeric process exit code. */
   exitCode: number;
   /** Complete standard error output. */

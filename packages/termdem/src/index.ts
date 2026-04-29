@@ -33,8 +33,11 @@ export {
 export type {
   ExecOptions,
   ExecResult,
+  HiddenPaneController,
   PaneController,
   PaneScreenSnapshot,
   PressKey,
+  SidecarExecOptions,
+  SidecarExecResult,
   TypeOptions,
 } from "./types.ts";
