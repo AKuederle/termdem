@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-29
+
 ### Changed
 
 - Commands in `setup` and `teardown` are not hidden by default anymore, but require you to explicitly use
@@ -50,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public npm release of `@akuederle/termdem`.
 - Added terminal demo scripting, preview, recording, and multi-pane rendering support.
 
-[unreleased]: https://github.com/AKuederle/termdem/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/AKuederle/termdem/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/AKuederle/termdem/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/AKuederle/termdem/compare/v0.1.0...v0.3.0
 [0.1.0]: https://github.com/AKuederle/termdem/releases/tag/v0.1.0
