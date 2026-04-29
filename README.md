@@ -214,8 +214,14 @@ settings: {
   typeDelayMs: typingDelays.WPM_120,
 },
 
+...
+// This will be typed at WPM_120 from the global settings
+await pane.exec("ls .");
+// This will be instant. All characters send as one
 await pane.exec("npm test", { typeDelayMs: 0 });
+// This will be typed character by character at WPM_60
 await pane.type("iTyped into Vim\n", { typeDelayMs: typingDelays.WPM_60 });
+// The first part will be typed at WPM_80 and then the second part instant
 await pane.exec(
   ["node scripts/client.mjs ", typedString(quoteShellArg(url), { typeDelayMs: 0 })],
   { typeDelayMs: typingDelays.WPM_80 },
