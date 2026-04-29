@@ -153,7 +153,7 @@ test("playbook runtime exposes current pane screen snapshots to scripts", async 
   expect(actual).toEqual(snapshot);
 });
 
-test("playbook runtime runs hidden lifecycle hooks around the visible script", async () => {
+test("playbook runtime requires explicit hidden pane calls in lifecycle hooks", async () => {
   const states: string[] = [];
   const visibleOutput: string[] = [];
   const teardownData: string[] = [];
@@ -176,32 +176,33 @@ test("playbook runtime runs hidden lifecycle hooks around the visible script", a
     },
     {
       setup: async (api) => {
-        const result = await api.pane("main").exec("printf 'hidden setup output'");
-        await api.pane("main").sendLine("printf hidden-sendline");
-        await api.pane("main").type("printf hidden-type");
-        await api.pane("main").press("Enter");
-        await api.pane("main").type("printf hidden-type-enter\r");
-        await api.pane("main").type("printf hidden-multi-a\rprintf hidden-multi-b\r");
-        await api
-          .pane("main")
-          .type(
-            "printf '(main) $ (main) $ hidden-prompt-string'\rprintf hidden-after-prompt-string\r",
-          );
-        await api.pane("main").press(keys.CTRL_L);
-        await api.pane("main").press(keys.ESC);
-        await api.pane("main").press("Enter");
-        await api.pane("main").exec("true");
+        const pane = api.pane("main");
+        await pane.exec("printf visible-setup");
+        const result = await pane.hidden.exec("printf 'hidden setup output'");
+        await pane.hidden.sendLine("printf hidden-sendline");
+        await pane.hidden.type("printf hidden-type");
+        await pane.hidden.press("Enter");
+        await pane.hidden.type("printf hidden-type-enter\r");
+        await pane.hidden.type("printf hidden-multi-a\rprintf hidden-multi-b\r");
+        await pane.hidden.type(
+          "printf '(main) $ (main) $ hidden-prompt-string'\rprintf hidden-after-prompt-string\r",
+        );
+        await pane.hidden.press(keys.CTRL_L);
+        await pane.hidden.press(keys.ESC);
+        await pane.hidden.press("Enter");
+        await pane.hidden.exec("true");
         return { message: result.text };
       },
       teardown: async (api, setupData) => {
         expect(states).not.toContain("done");
         teardownData.push(setupData.message);
-        await api.pane("main").exec("printf hidden-teardown");
+        await api.pane("main").hidden.exec("printf hidden-teardown");
       },
     },
   );
 
   const transcript = visibleOutput.join("");
+  expect(transcript).toContain("visible-setup");
   expect(transcript).toContain("printf visible-script");
   expect(transcript).toContain("visible-script");
   expect(transcript).not.toContain("hidden setup output");

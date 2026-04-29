@@ -73,6 +73,14 @@ export type ExecResult = {
  */
 export interface PaneController {
   /**
+   * Runs pane input through the same shell session without showing it in the terminal pane.
+   *
+   * Hidden pane work can read and mutate shell state such as exported variables and the
+   * current directory. It still requires the pane shell to be ready for input.
+   */
+  hidden: HiddenPaneController;
+
+  /**
    * Returns the latest current working directory observed for this pane.
    *
    * The value updates whenever the shell returns to a prompt, so it reflects completed
@@ -180,6 +188,20 @@ export interface PaneController {
    * ```
    */
   sendLine(command: TypableText, options?: TypeOptions): Promise<void>;
+}
+
+/**
+ * Hidden controls for a terminal pane.
+ */
+export interface HiddenPaneController {
+  /** Hidden equivalent of `pane.type()`. */
+  type(text: TypableText, options?: TypeOptions): Promise<void>;
+  /** Hidden equivalent of `pane.press()`. */
+  press(key: PressKey): Promise<void>;
+  /** Hidden equivalent of `pane.exec()`. */
+  exec(command: TypableText): Promise<ExecResult>;
+  /** Hidden equivalent of `pane.sendLine()`. */
+  sendLine(command: TypableText): Promise<void>;
 }
 
 /**

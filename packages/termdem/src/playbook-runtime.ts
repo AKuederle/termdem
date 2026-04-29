@@ -74,7 +74,6 @@ export class PlaybookRuntime<Name extends string = string> {
   private activeRun: Promise<void> | null = null;
   private generation = 0;
   private closed = false;
-  private hiddenPaneOutputDepth = 0;
 
   constructor(options: PlaybookRuntimeOptions) {
     this.options = options;
@@ -94,10 +93,6 @@ export class PlaybookRuntime<Name extends string = string> {
         cols: size.cols,
         cwd: workspace.cwd,
         onOutput: (data) => {
-          if (this.hiddenPaneOutputDepth > 0) {
-            return;
-          }
-
           this.options.onPaneOutput?.({ data, pane: terminal.name });
         },
         prompt,
@@ -213,7 +208,6 @@ export class PlaybookRuntime<Name extends string = string> {
     generation: number,
     options: {
       defaultTypeDelayMs?: number;
-      hiddenPaneExec?: boolean;
       publishActions?: boolean;
     } = {},
   ): TerminalDemoScriptApi<Name> {
@@ -245,12 +239,9 @@ export class PlaybookRuntime<Name extends string = string> {
     try {
       const setupApi = this.createApi(generation, {
         defaultTypeDelayMs: 0,
-        hiddenPaneExec: true,
         publishActions: false,
       });
-      setupData = (await this.runWithHiddenPaneOutput(() => lifecycle.setup?.(setupApi))) as
-        | SetupData
-        | undefined;
+      setupData = (await lifecycle.setup?.(setupApi)) as SetupData | undefined;
       setupComplete = true;
       await script(this.createApi(generation), setupData as SetupData);
     } catch (error) {
@@ -262,12 +253,9 @@ export class PlaybookRuntime<Name extends string = string> {
         const teardownGeneration = this.closed ? generation : this.generation;
         const teardownApi = this.createApi(teardownGeneration, {
           defaultTypeDelayMs: 0,
-          hiddenPaneExec: true,
           publishActions: false,
         });
-        await this.runWithHiddenPaneOutput(() =>
-          lifecycle.teardown?.(teardownApi, setupData as SetupData),
-        );
+        await lifecycle.teardown?.(teardownApi, setupData as SetupData);
       } catch (error) {
         runError ??= error;
       }
@@ -336,34 +324,37 @@ export class PlaybookRuntime<Name extends string = string> {
       },
       exec: async (command: TypableText, options?: ExecOptions): Promise<ExecResult> => {
         await this.ensureActive(generation, actionName("exec"));
-        if (controllerOptions.hiddenPaneExec) {
-          return this.readyPane(name).execHidden(typableTextValue(command));
-        }
         return this.readyPane(name).exec(command, withExecCheckpoint(options));
       },
       press: async (key: PressKey): Promise<void> => {
         await this.ensureActive(generation, actionName("press"));
-        if (controllerOptions.hiddenPaneExec) {
-          await this.readyPane(name).pressHidden(key);
-          return;
-        }
         await this.readyPane(name).press(key);
       },
       sendLine: async (command: TypableText, options?: TypeOptions): Promise<void> => {
         await this.ensureActive(generation, actionName("sendLine"));
-        if (controllerOptions.hiddenPaneExec) {
-          await this.readyPane(name).sendLineHidden(command);
-          return;
-        }
         await this.readyPane(name).sendLine(command, withDefaultTypeDelay(options));
       },
       type: async (text: TypableText, options?: TypeOptions): Promise<void> => {
         await this.ensureActive(generation, actionName("type"));
-        if (controllerOptions.hiddenPaneExec) {
-          await this.readyPane(name).typeHidden(text, withDefaultTypeDelay(options));
-          return;
-        }
         await this.readyPane(name).type(text, withDefaultTypeDelay(options));
+      },
+      hidden: {
+        exec: async (command: TypableText): Promise<ExecResult> => {
+          await this.ensureActive(generation, actionName("hidden.exec"));
+          return this.readyPane(name).execHidden(typableTextValue(command));
+        },
+        press: async (key: PressKey): Promise<void> => {
+          await this.ensureActive(generation, actionName("hidden.press"));
+          await this.readyPane(name).pressHidden(key);
+        },
+        sendLine: async (command: TypableText): Promise<void> => {
+          await this.ensureActive(generation, actionName("hidden.sendLine"));
+          await this.readyPane(name).sendLineHidden(command);
+        },
+        type: async (text: TypableText, options?: TypeOptions): Promise<void> => {
+          await this.ensureActive(generation, actionName("hidden.type"));
+          await this.readyPane(name).typeHidden(text, withDefaultTypeDelay(options));
+        },
       },
     };
   }
@@ -394,15 +385,6 @@ export class PlaybookRuntime<Name extends string = string> {
 
   private publishPlaybookState(state: PlaybookState) {
     this.options.onPlaybookState?.(state);
-  }
-
-  private async runWithHiddenPaneOutput<T>(task: () => T | Promise<T>) {
-    this.hiddenPaneOutputDepth += 1;
-    try {
-      return await task();
-    } finally {
-      this.hiddenPaneOutputDepth -= 1;
-    }
   }
 
   private async closePanes() {
