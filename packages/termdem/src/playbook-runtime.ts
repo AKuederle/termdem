@@ -12,6 +12,7 @@ import type {
   ExecOptions,
   ExecResult,
   PaneController,
+  PaneEnvironment,
   PaneScreenSnapshot,
   PressKey,
   SidecarExecOptions,
@@ -314,6 +315,15 @@ export class PlaybookRuntime<Name extends string = string> {
         await this.ensureActive(generation, actionName("cwd"));
         return this.readyPane(name).cwd();
       },
+      getEnv: async (): Promise<PaneEnvironment> => {
+        await this.ensureActive(generation, actionName("getEnv"));
+        const session = this.readyPane(name);
+        return {
+          cwd: await session.cwd(),
+          env: await session.getEnvVars(),
+          pane: name,
+        };
+      },
       screen: async (): Promise<PaneScreenSnapshot> => {
         await this.ensureActive(generation, actionName("screen"));
         if (!this.options.readPaneScreen) {
@@ -413,8 +423,8 @@ export function execSidecar(
       file,
       [...args],
       {
-        cwd: options.cwd,
-        env: options.env ? { ...process.env, ...options.env } : process.env,
+        cwd: options.cwd ?? options.environment?.cwd,
+        env: sidecarEnv(options),
         timeout: options.timeoutMs,
       },
       (error, stdout, stderr) => {
@@ -442,6 +452,14 @@ export function execSidecar(
       reject(error);
     });
   });
+}
+
+function sidecarEnv(options: SidecarExecOptions) {
+  if (options.environment) {
+    return { ...options.environment.env, ...options.env };
+  }
+
+  return options.env ? { ...process.env, ...options.env } : process.env;
 }
 
 function exitCodeFromExecFileError(error: Error | null) {

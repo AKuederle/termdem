@@ -6,7 +6,7 @@ import { keys } from "../src/keys.ts";
 import { PlaybookRuntime } from "../src/playbook-runtime.ts";
 import { createPaneSession } from "../src/pane-session.ts";
 import type { SidecarExecResult, PaneScreenSnapshot } from "../src/types.ts";
-import { TmpDir } from "../src/workspace.ts";
+import { Dir, TmpDir } from "../src/workspace.ts";
 
 const cleanupPaths: string[] = [];
 
@@ -121,6 +121,64 @@ test("playbook runtime exposes pane cwd after visible commands change it", async
     await pane.exec("mkdir nested && cd nested");
 
     expect(await pane.cwd()).toBe(join(initialCwd, "nested"));
+  });
+});
+
+test("sidecar exec can run with a pane environment snapshot", async () => {
+  const workspace = await createTempDir();
+  const nested = join(workspace, "nested");
+  const scriptPath = join(workspace, "inspect-env.mjs");
+  await writeFile(
+    scriptPath,
+    [
+      "process.stdout.write(JSON.stringify({",
+      "  cwd: process.cwd(),",
+      "  value: process.env.TERMDEM_SIDECAR_ENV,",
+      "  override: process.env.TERMDEM_OVERRIDE_ENV,",
+      "}));",
+    ].join("\n"),
+    "utf8",
+  );
+  const runtime = new PlaybookRuntime({
+    terminalDefinitions: [{ name: "main", pwd: new Dir({ path: workspace }) }],
+    typeDelayMs: 0,
+  });
+  let inherited: unknown;
+  let overridden: unknown;
+
+  await runtime.run(async (api) => {
+    const pane = api.pane("main");
+    await pane.hidden.exec("mkdir nested && cd nested && export TERMDEM_SIDECAR_ENV='from pane'");
+    const environment = await pane.getEnv();
+
+    expect(environment.pane).toBe("main");
+    expect(environment.cwd).toBe(nested);
+    expect(environment.env.TERMDEM_SIDECAR_ENV).toBe("from pane");
+
+    const inheritedResult = await api.sidecar.exec(process.execPath, [scriptPath], {
+      environment,
+    });
+    inherited = JSON.parse(inheritedResult.stdout);
+
+    const overriddenResult = await api.sidecar.exec(process.execPath, [scriptPath], {
+      cwd: workspace,
+      env: {
+        TERMDEM_OVERRIDE_ENV: "from override",
+        TERMDEM_SIDECAR_ENV: "override wins",
+      },
+      environment,
+    });
+    overridden = JSON.parse(overriddenResult.stdout);
+  });
+
+  expect(inherited).toEqual({
+    cwd: nested,
+    value: "from pane",
+  });
+  expect(overridden).toEqual({
+    cwd: workspace,
+    override: "from override",
+    value: "override wins",
   });
 });
 

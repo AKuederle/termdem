@@ -15,9 +15,10 @@ export type PaneSessionOptions = {
   onOutput?: (chunk: string) => void;
 };
 
-export interface PaneSession extends PaneController {
+export interface PaneSession extends Omit<PaneController, "getEnv" | "hidden"> {
   close(): Promise<void>;
   execHidden(command: string): Promise<ExecResult>;
+  getEnvVars(): Promise<Record<string, string>>;
   pressHidden(key: PressKey): Promise<void>;
   resize(cols: number, rows: number): Promise<void>;
   sendLineHidden(command: TypableText): Promise<void>;
@@ -166,6 +167,17 @@ class NodePtyPaneSession implements PaneSession {
     return this.enqueue(async () => this.currentCwd);
   }
 
+  async getEnvVars() {
+    return this.enqueue(async () => {
+      const result = await this.performExecHidden(exportedEnvironmentCommand);
+      if (result.exitCode !== 0) {
+        throw new Error(`Failed to capture pane environment: ${result.text}`);
+      }
+
+      return parseExportedEnvironment(result.text);
+    });
+  }
+
   async screen() {
     return this.enqueue(async () => {
       throw new Error("Pane screen reads require a preview client");
@@ -203,10 +215,7 @@ class NodePtyPaneSession implements PaneSession {
 
   async execHidden(command: string) {
     return this.enqueue(async () => {
-      const pending = await this.beginExec(command, { visible: false });
-      this.pty.write(buildExecShellCommand(command, pending.id));
-      this.pty.write("\r");
-      return pending.result;
+      return this.performExecHidden(command);
     });
   }
 
@@ -301,6 +310,13 @@ class NodePtyPaneSession implements PaneSession {
     result.catch(() => {});
 
     return { id, result };
+  }
+
+  private async performExecHidden(command: string) {
+    const pending = await this.beginExec(command, { visible: false });
+    this.pty.write(buildExecShellCommand(command, pending.id));
+    this.pty.write("\r");
+    return pending.result;
   }
 
   private enqueue<T>(task: () => Promise<T>) {
@@ -508,6 +524,36 @@ class NodePtyPaneSession implements PaneSession {
   private hideOutputUntilPrompts(count: number) {
     this.hiddenOutputUntilPrompt += count;
   }
+}
+
+const exportedEnvironmentCommand = [
+  "while IFS= read -r __td_env_name; do",
+  "printf '%s\\t%s\\n'",
+  `"$(printf '%s' "$__td_env_name" | base64 | tr -d '\\n')"`,
+  `"$(printf '%s' "\${!__td_env_name}" | base64 | tr -d '\\n')";`,
+  "done < <(compgen -e)",
+].join(" ");
+
+function parseExportedEnvironment(text: string) {
+  const env: Record<string, string> = {};
+  for (const line of text.split("\n")) {
+    if (line === "") {
+      continue;
+    }
+
+    const [encodedName, encodedValue] = line.split("\t", 2);
+    if (!encodedName || encodedValue === undefined) {
+      continue;
+    }
+
+    env[decodeBase64(encodedName)] = decodeBase64(encodedValue);
+  }
+
+  return env;
+}
+
+function decodeBase64(value: string) {
+  return Buffer.from(value, "base64").toString("utf8");
 }
 
 function buildExecShellCommand(command: string, stepId: string) {

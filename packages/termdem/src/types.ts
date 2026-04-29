@@ -96,6 +96,14 @@ export interface PaneController {
   cwd(): Promise<string>;
 
   /**
+   * Captures the pane shell's exported environment and current working directory.
+   *
+   * This is a snapshot taken by running a hidden command in the pane shell. It only
+   * includes exported environment variables and requires the shell to be ready for input.
+   */
+  getEnv(): Promise<PaneEnvironment>;
+
+  /**
    * Reads the terminal pane's current rendered screen.
    *
    * The snapshot reflects the terminal emulator buffer, so redraw-based programs such as
@@ -205,6 +213,18 @@ export interface HiddenPaneController {
 }
 
 /**
+ * Exported pane shell environment captured at a point in time.
+ */
+export type PaneEnvironment = {
+  /** Pane name the snapshot came from. */
+  pane: string;
+  /** Pane current working directory when the snapshot was captured. */
+  cwd: string;
+  /** Exported environment variables from the pane shell. */
+  env: Record<string, string>;
+};
+
+/**
  * Options for `api.sidecar.exec()`, which runs a hidden sidecar process.
  */
 export type SidecarExecOptions = {
@@ -212,6 +232,8 @@ export type SidecarExecOptions = {
   cwd?: string;
   /** Environment variables for the child process. Defaults to the preview server process environment. */
   env?: NodeJS.ProcessEnv;
+  /** Pane environment snapshot to use as the child process environment and cwd defaults. */
+  environment?: PaneEnvironment;
   /**
    * Optional pane name associated with this background work in preview/recording status.
    *

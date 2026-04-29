@@ -35,6 +35,7 @@ export type {
   ExecResult,
   HiddenPaneController,
   PaneController,
+  PaneEnvironment,
   PaneScreenSnapshot,
   PressKey,
   SidecarExecOptions,
