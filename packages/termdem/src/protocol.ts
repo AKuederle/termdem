@@ -33,7 +33,7 @@ export type PaneScreenResponseMessage = {
 };
 
 export type PlaybookControlMessage = {
-  type: "playbook.start" | "playbook.restart" | "playbook.stop";
+  type: "playbook.prepare" | "playbook.start" | "playbook.restart" | "playbook.stop";
 };
 
 export type BrowserToServerMessage =
@@ -78,7 +78,7 @@ export type PlaybookStateMessage = {
 
 export type RecordingStateMessage = {
   type: "recording.state";
-  state: "ready" | "started" | "done" | "error";
+  state: "ready" | "prepared" | "started" | "done" | "error";
   action?: string;
   error?: string;
 };
@@ -140,6 +140,7 @@ export function parseBrowserToServerMessage(raw: string): BrowserToServerMessage
         snapshot,
       };
     }
+    case "playbook.prepare":
     case "playbook.start":
     case "playbook.restart":
     case "playbook.stop":
@@ -311,5 +312,11 @@ function isPlaybookState(value: unknown) {
 }
 
 function isRecordingState(value: unknown) {
-  return value === "ready" || value === "started" || value === "done" || value === "error";
+  return (
+    value === "ready" ||
+    value === "prepared" ||
+    value === "started" ||
+    value === "done" ||
+    value === "error"
+  );
 }

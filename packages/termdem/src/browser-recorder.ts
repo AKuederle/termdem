@@ -40,6 +40,9 @@ export async function recordBrowserPage(options: BrowserRecordingOptions): Promi
 
     options.onProgress?.("Waiting for terminal panes");
     await waitForRecordingReady(page);
+    options.onProgress?.("Running demo setup");
+    await prepareRecordingDemo(page);
+    await waitForRecordingPrepared(page, options);
     options.onProgress?.("Starting browser recording");
     await page.screencast.start({
       path: rawVideoPath,
@@ -125,6 +128,34 @@ async function startRecordingDemo(page: Page) {
   });
 }
 
+async function prepareRecordingDemo(page: Page) {
+  await page.evaluate(() => {
+    globalThis.__termdem?.controls?.prepare?.();
+  });
+}
+
+async function waitForRecordingPrepared(page: Page, options: BrowserRecordingOptions) {
+  const timeoutMs = options.doneTimeoutMs ?? defaultDoneTimeoutMs;
+  const startedAt = Date.now();
+
+  while (true) {
+    const status = await recordingStatus(page);
+    if (status.prepared) {
+      return;
+    }
+
+    if (status.error) {
+      throw new Error(`Demo setup failed before recording: ${status.error}`);
+    }
+
+    if (recordingHasTimedOut(startedAt, Date.now(), timeoutMs)) {
+      throw new Error("Timed out waiting for demo setup to finish");
+    }
+
+    await page.waitForTimeout(500);
+  }
+}
+
 async function waitForRecordingDone(page: Page, options: BrowserRecordingOptions) {
   if (options.waitForDone) {
     await options.waitForDone(page);
@@ -176,6 +207,7 @@ async function recordingStatus(page: Page) {
     action: globalThis.__termdem?.recording?.action,
     done: globalThis.__termdem?.recording?.done === true,
     error: globalThis.__termdem?.recording?.error,
+    prepared: globalThis.__termdem?.recording?.prepared === true,
   }));
 }
 
@@ -223,6 +255,7 @@ declare global {
   var __termdem:
     | {
         controls?: {
+          prepare?: () => void;
           restart?: () => void;
           start?: () => void;
           stop?: () => void;
@@ -231,6 +264,7 @@ declare global {
           action?: string;
           done?: boolean;
           error?: string;
+          prepared?: boolean;
           ready?: boolean;
         };
       }

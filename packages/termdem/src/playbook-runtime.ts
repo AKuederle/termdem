@@ -36,6 +36,7 @@ export type PlaybookState =
 
 export type RecordingState =
   | { state: "ready" }
+  | { state: "prepared" }
   | { state: "started"; action?: string }
   | { state: "done" }
   | { state: "error"; error: string };
@@ -63,6 +64,18 @@ type ManagedPane = {
   workspace: TerminalWorkspace;
 };
 
+type PreparedRun<Name extends string, SetupData> = {
+  generation: number;
+  lifecycle: PlaybookLifecycle<Name, SetupData>;
+  setupData: SetupData | undefined;
+};
+
+type StoredPreparedRun<Name extends string> = {
+  generation: number;
+  lifecycle: PlaybookLifecycle<Name, any>;
+  setupData: any;
+};
+
 export type PlaybookLifecycle<Name extends string, SetupData = undefined> = {
   setup?: TerminalDemoSetup<Name, SetupData>;
   teardown?: TerminalDemoTeardown<Name, SetupData>;
@@ -73,6 +86,7 @@ export class PlaybookRuntime<Name extends string = string> {
   private readonly panes = new Map<string, ManagedPane>();
   private readonly paneSizes = new Map<string, { cols: number; rows: number }>();
   private activeRun: Promise<void> | null = null;
+  private preparedRun: StoredPreparedRun<Name> | null = null;
   private generation = 0;
   private closed = false;
 
@@ -132,9 +146,49 @@ export class PlaybookRuntime<Name extends string = string> {
     return run;
   }
 
+  async prepare<SetupData = undefined>(lifecycle: PlaybookLifecycle<Name, SetupData> = {}) {
+    if (this.activeRun) {
+      return this.activeRun;
+    }
+
+    const run = this.prepareScript(lifecycle);
+    this.activeRun = run;
+    void run.finally(() => {
+      if (this.activeRun === run) {
+        this.activeRun = null;
+      }
+    });
+    return run;
+  }
+
+  async runPrepared<SetupData = undefined>(
+    script: TerminalDemoScript<Name, SetupData>,
+    lifecycle: PlaybookLifecycle<Name, SetupData> = {},
+  ) {
+    if (this.activeRun) {
+      return this.activeRun;
+    }
+
+    const preparedRun = this.preparedRun as PreparedRun<Name, SetupData> | null;
+    if (!preparedRun) {
+      return this.run(script, lifecycle);
+    }
+
+    this.preparedRun = null;
+    const run = this.runPreparedScript(script, preparedRun);
+    this.activeRun = run;
+    void run.finally(() => {
+      if (this.activeRun === run) {
+        this.activeRun = null;
+      }
+    });
+    return run;
+  }
+
   stop() {
     this.generation += 1;
     this.activeRun = null;
+    this.preparedRun = null;
     this.publishPlaybookState({ state: "stopped" });
   }
 
@@ -232,7 +286,6 @@ export class PlaybookRuntime<Name extends string = string> {
     const generation = ++this.generation;
     await this.ensureReady();
     this.publishPlaybookState({ state: "running" });
-    this.options.onRecordingState?.({ state: "started" });
     let setupComplete = false;
     let setupData: SetupData | undefined;
     let runError: unknown;
@@ -244,11 +297,68 @@ export class PlaybookRuntime<Name extends string = string> {
       });
       setupData = (await lifecycle.setup?.(setupApi)) as SetupData | undefined;
       setupComplete = true;
+      this.options.onRecordingState?.({ state: "started" });
       await script(this.createApi(generation), setupData as SetupData);
     } catch (error) {
       runError = error;
     }
 
+    await this.finishRun(generation, lifecycle, setupComplete, setupData, runError);
+  }
+
+  private async prepareScript<SetupData = undefined>(
+    lifecycle: PlaybookLifecycle<Name, SetupData>,
+  ) {
+    const generation = ++this.generation;
+    await this.ensureReady();
+    this.publishPlaybookState({ state: "running" });
+    let setupData: SetupData | undefined;
+
+    try {
+      const setupApi = this.createApi(generation, {
+        defaultTypeDelayMs: 0,
+        publishActions: false,
+      });
+      setupData = (await lifecycle.setup?.(setupApi)) as SetupData | undefined;
+    } catch (error) {
+      if (this.isCurrent(generation)) {
+        const message = formatError(error);
+        this.publishPlaybookState({ state: "error", error: message });
+        this.options.onRecordingState?.({ state: "error", error: message });
+      }
+      return;
+    }
+
+    if (this.isCurrent(generation)) {
+      this.preparedRun = { generation, lifecycle, setupData };
+      this.options.onRecordingState?.({ state: "prepared" });
+    }
+  }
+
+  private async runPreparedScript<SetupData = undefined>(
+    script: TerminalDemoScript<Name, SetupData>,
+    preparedRun: PreparedRun<Name, SetupData>,
+  ) {
+    const { generation, lifecycle, setupData } = preparedRun;
+    this.options.onRecordingState?.({ state: "started" });
+    let runError: unknown;
+
+    try {
+      await script(this.createApi(generation), setupData as SetupData);
+    } catch (error) {
+      runError = error;
+    }
+
+    await this.finishRun(generation, lifecycle, true, setupData, runError);
+  }
+
+  private async finishRun<SetupData = undefined>(
+    generation: number,
+    lifecycle: PlaybookLifecycle<Name, SetupData>,
+    setupComplete: boolean,
+    setupData: SetupData | undefined,
+    runError: unknown,
+  ) {
     if (setupComplete && lifecycle.teardown) {
       try {
         const teardownGeneration = this.closed ? generation : this.generation;

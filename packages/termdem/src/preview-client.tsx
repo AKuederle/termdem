@@ -363,6 +363,7 @@ function PreviewApp({ demo }: { demo: PreviewDemoModule }) {
     globalThis.__termdem = {
       ...globalThis.__termdem,
       controls: {
+        prepare: () => send({ type: "playbook.prepare" }),
         restart: () => sendControl("restart"),
         start: () => send({ type: "playbook.start" }),
         stop: () => sendControl("stop"),
@@ -736,6 +737,12 @@ function updateRecordingState(
   switch (message.state) {
     case "ready":
       markRecordingReady(true);
+      markRecordingPrepared(false);
+      markRecordingDone(false);
+      markRecordingError(undefined);
+      return;
+    case "prepared":
+      markRecordingPrepared(true);
       markRecordingDone(false);
       markRecordingError(undefined);
       return;
@@ -771,6 +778,17 @@ function markRecordingStarted(action?: string) {
       action,
       done: false,
       error: undefined,
+      prepared: false,
+    },
+  };
+}
+
+function markRecordingPrepared(prepared: boolean) {
+  globalThis.__termdem = {
+    ...globalThis.__termdem,
+    recording: {
+      ...globalThis.__termdem?.recording,
+      prepared,
     },
   };
 }
@@ -828,6 +846,7 @@ declare global {
   var __termdem:
     | {
         controls?: {
+          prepare?: () => void;
           restart?: () => void;
           start?: () => void;
           stop?: () => void;
@@ -836,6 +855,7 @@ declare global {
           action?: string;
           done?: boolean;
           error?: string;
+          prepared?: boolean;
           ready?: boolean;
         };
       }

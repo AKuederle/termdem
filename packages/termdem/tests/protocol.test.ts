@@ -102,6 +102,9 @@ test("parseBrowserToServerMessage accepts empty pane screen responses before bri
 });
 
 test("parseBrowserToServerMessage accepts playbook controls and rejects browser playbook actions", () => {
+  expect(parseBrowserToServerMessage(JSON.stringify({ type: "playbook.prepare" }))).toEqual({
+    type: "playbook.prepare",
+  });
   expect(parseBrowserToServerMessage(JSON.stringify({ type: "playbook.start" }))).toEqual({
     type: "playbook.start",
   });

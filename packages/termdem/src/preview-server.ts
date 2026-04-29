@@ -489,9 +489,14 @@ async function handleBrowserMessage({
     case "pane.screen.response":
       paneScreenRequests.resolve(parsed);
       return;
+    case "playbook.prepare":
+      if (demo.script) {
+        await runtime.prepare({ setup: demo.setup, teardown: demo.teardown });
+      }
+      return;
     case "playbook.start":
       if (demo.script) {
-        await runtime.run(demo.script, { setup: demo.setup, teardown: demo.teardown });
+        await runtime.runPrepared(demo.script, { setup: demo.setup, teardown: demo.teardown });
       }
       return;
     case "playbook.stop":

@@ -11,8 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Commands in `setup` and `teardown` are not hidden by default anymore, but require you to explicitly use
   the new `hidden` API (see "Added").
-  If you don't use hidden during setup, the terminal will have content pre-populated when you start the recording.
+  If you don't use hidden during setup, the terminal will have content pre-populated when the script starts.
 - Renamed `api.node.exec()` to `api.sidecar.exec()`.
+
+### Fixed
+
+- Fixed `termdem record` capturing demo-level `setup` as it ran. Visible setup output is now present in
+  the first recorded frame without capturing the setup work being generated.
 
 ### Added
 

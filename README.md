@@ -168,7 +168,9 @@ panes: [
 ### Run Setup and Teardown
 
 Directory `setup` and `teardown` prepare files before panes start, while demo-level `setup` and `teardown` use the same API as `script`.
-Demo-level setup and teardown pane commands are visible by default, run with instant typing by default, and `setup` can return data that is passed as the second `script` argument.
+Demo-level setup runs before recording starts, so any visible setup output is already present in the first recorded frame.
+It can return data that is passed as the second `script` argument.
+Demo-level setup and teardown pane commands are visible by default and run with instant typing by default.
 Use `pane.hidden.*` for setup or teardown commands that should run in the pane shell without appearing in the terminal.
 
 ```ts

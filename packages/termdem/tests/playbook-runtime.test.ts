@@ -299,6 +299,37 @@ test("playbook runtime persists exported setup env in the visible script", async
   expect(visibleEnv).toBe("from-setup");
 });
 
+test("playbook runtime can prepare setup before starting recording", async () => {
+  const recordingStates: string[] = [];
+  const runtime = new PlaybookRuntime({
+    onRecordingState(state) {
+      recordingStates.push(state.state);
+    },
+    terminalDefinitions: [{ name: "main", pwd: new TmpDir({}) }],
+    typeDelayMs: 0,
+  });
+  let visibleEnv = "";
+
+  await runtime.prepare({
+    setup: async (api) => {
+      await api.pane("main").exec("export TERMDEM_SETUP_ENV=prepared");
+      return { value: "setup-data" };
+    },
+  });
+
+  expect(recordingStates).toEqual(["ready", "prepared"]);
+
+  await runtime.runPrepared(async (api, setupData: { value: string }) => {
+    const result = await api
+      .pane("main")
+      .exec(`printf '%s:%s' "$TERMDEM_SETUP_ENV" '${setupData.value}'`);
+    visibleEnv = result.text;
+  });
+
+  expect(visibleEnv).toBe("prepared:setup-data");
+  expect(recordingStates).toEqual(["ready", "prepared", "started", "started", "done"]);
+});
+
 test("playbook runtime cancellation prevents stale playbook completion", async () => {
   const states: string[] = [];
   const runtime = new PlaybookRuntime({
