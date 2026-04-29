@@ -286,7 +286,6 @@ export class PlaybookRuntime<Name extends string = string> {
     generation: number,
     controllerOptions: {
       defaultTypeDelayMs?: number;
-      hiddenPaneExec?: boolean;
       publishActions?: boolean;
     } = {},
   ): PaneController {

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced implicit hidden lifecycle pane commands with explicit `pane.hidden.*` controls.
+- Renamed `api.node.exec()` to `api.sidecar.exec()`.
+
+### Added
+
+- Added `pane.getEnv()` snapshots for running sidecar processes with a pane's exported environment and cwd.
+
 ## [0.3.0] - 2026-04-28
 
 ### Added

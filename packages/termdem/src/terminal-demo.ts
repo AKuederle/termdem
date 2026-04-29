@@ -72,7 +72,7 @@ type Awaitable<T> = T | Promise<T>;
  * API passed to the script function provided to `createTerminalDemo()`.
  *
  * The script API is the main authoring surface for a demo. It lets the script select
- * visible panes, run hidden setup or readiness checks, and control timing.
+ * visible panes, run hidden pane or sidecar checks, and control timing.
  *
  * Use `TerminalDemoScriptApi` when extracting script helpers into named functions. The
  * `Name` type parameter should be the union of terminal names that helper accepts.
@@ -213,21 +213,21 @@ export type CreateTerminalDemoOptions<
 > = {
   /** Terminal panes available to the script and render function. */
   panes: TTerminals;
-  /** Script that drives visible panes and hidden Node-side work. */
+  /** Script that drives visible panes, hidden pane work, and sidecar work. */
   script: TerminalDemoScript<TTerminals[number]["name"], SetupData>;
   /**
-   * Hidden setup callback run before the visible demo script.
+   * Setup callback run before the visible demo script.
    *
-   * It receives the same API as the script, but pane commands run without frontend output
-   * and default to instant execution. Pane commands run in the same shell session used by the
-   * visible script, so shell state such as exported environment variables persists. Its return
-   * value is passed to the script.
+   * It receives the same API as the script. Pane commands are visible unless they use
+   * `pane.hidden.*`, and setup input defaults to instant typing. Its return value is
+   * passed to the script.
    */
   setup?: TerminalDemoSetup<TTerminals[number]["name"], SetupData>;
   /**
-   * Hidden teardown callback run after the visible demo script.
+   * Teardown callback run after the visible demo script.
    *
-   * It receives the same hidden API as setup and the setup return value.
+   * It receives the same API as setup and the setup return value. Use `pane.hidden.*`
+   * or `api.sidecar.exec()` for work that should not be shown in terminal output.
    */
   teardown?: TerminalDemoTeardown<TTerminals[number]["name"], SetupData>;
   /** Recording and preview configuration for this demo. */
@@ -244,13 +244,13 @@ export type TerminalDemo<
 > = {
   /** Terminal panes available to the script and render function. */
   panes: TTerminals;
-  /** Script that drives visible panes and hidden Node-side work. */
+  /** Script that drives visible panes, hidden pane work, and sidecar work. */
   script: TerminalDemoScript<TName, TSetupData>;
   /** Recording and preview configuration for this demo. */
   settings: RecordingConfig;
-  /** Hidden setup hook run before the visible script. */
+  /** Setup hook run before the visible script. */
   setup?: TerminalDemoSetup<TName, TSetupData>;
-  /** Hidden teardown hook run after the visible script. */
+  /** Teardown hook run after the visible script. */
   teardown?: TerminalDemoTeardown<TName, TSetupData>;
 };
 

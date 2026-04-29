@@ -54,7 +54,7 @@ export const demo = createTerminalDemo({
     // ignore user config/history, skip swap files, and make Esc resolve quickly.
     await api
       .pane("git")
-      .exec(`alias vim='vim -Nu NONE -n -i NONE --cmd "set ttimeout ttimeoutlen=10"'`);
+      .hidden.exec(`alias vim='vim -Nu NONE -n -i NONE --cmd "set ttimeout ttimeoutlen=10"'`);
   },
   settings: {
     size: { width: 1280, height: 720 },

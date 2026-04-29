@@ -110,7 +110,7 @@ export const demo = createTerminalDemo({
       typedString(quoteShellArg(url), { typeDelayMs: 0 }),
     ]);
     await api.waitFor("server ready", async () => {
-      const result = await api.node.exec("curl", ["-fsS", url], {
+      const result = await api.sidecar.exec("curl", ["-fsS", url], {
         reject: false,
         timeoutMs: 1000,
       });
@@ -130,7 +130,7 @@ The pane API is for visible terminal work.
 Use `exec` for commands that should finish, `sendLine` for long-running processes, `type` for raw text input, and `press` for single keys or key combinations such as `keys.CTRL_C` and `keys.ESC`.
 
 The top-level API is for orchestration.
-Use `wait` for fixed delays, `waitFor` for readiness checks, and `node.exec` for hidden Node-side subprocesses that should not appear in the terminal.
+Use `wait` for fixed delays, `waitFor` for readiness checks, and `sidecar.exec` for hidden sidecar subprocesses that should not appear in the terminal.
 
 See the full [socket CLI example](./examples/socket-cli/demo.tsx) for a multi-pane server/client demo.
 See the full [Git/Vim example](./examples/git-vim/demo.tsx) for an interactive full-screen terminal app demo.
@@ -167,20 +167,21 @@ panes: [
 
 ### Run Setup and Teardown
 
-Directory `setup` and `teardown` prepare files before panes start, while demo-level `setup` and `teardown` use the same API as `script` for hidden terminal and Node-side work.
-Demo-level commands are not displayed, run with instant typing by default, and `setup` can return data that is passed as the second `script` argument.
+Directory `setup` and `teardown` prepare files before panes start, while demo-level `setup` and `teardown` use the same API as `script`.
+Demo-level setup and teardown pane commands are visible by default, run with instant typing by default, and `setup` can return data that is passed as the second `script` argument.
+Use `pane.hidden.*` for setup or teardown commands that should run in the pane shell without appearing in the terminal.
 
 ```ts
 export const demo = createTerminalDemo({
   setup: async (api) => {
-    const result = await api.pane("main").exec("node scripts/prepare.mjs");
+    const result = await api.pane("main").hidden.exec("node scripts/prepare.mjs");
     return { token: result.text };
   },
   script: async (api, setupData) => {
     await api.pane("main").exec(`node cli.mjs login ${quoteShellArg(setupData.token)}`);
   },
   teardown: async (api) => {
-    await api.node.exec("node", ["scripts/cleanup.mjs"], { reject: false });
+    await api.sidecar.exec("node", ["scripts/cleanup.mjs"], { reject: false });
   },
 });
 ```
@@ -250,20 +251,22 @@ await api.waitFor("dev server ready", async () => {
 
 ### "Hidden" Commands
 
-Use normal JavaScript inside `script`, `setup`, and `teardown` for values that do not need a shell, and use `api.node.exec()` for hidden subprocesses.
-`api.node.exec()` can run any executable available to the preview server, but it receives an executable plus an argument array rather than a shell command string.
+Use `pane.hidden.exec()`, `pane.hidden.sendLine()`, `pane.hidden.type()`, and `pane.hidden.press()` when hidden work must run in the same pane shell and influence later visible pane state such as exports or `cd`.
+Use normal JavaScript inside `script`, `setup`, and `teardown` for values that do not need a shell, and use `api.sidecar.exec()` for hidden subprocesses that do not need to modify pane state.
+`api.sidecar.exec()` can run any executable available to the preview server, but it receives an executable plus an argument array rather than a shell command string.
 Use `sh -c` explicitly if you need shell syntax such as pipes, redirects, or environment-variable expansion.
-Use `pane.cwd()` when the hidden process should run in the same current working directory as a pane.
+Use `pane.getEnv()` when the sidecar process should run with a snapshot of a pane's exported environment and current working directory.
+Capture the snapshot before starting a foreground process such as a dev server or Vim, because the pane shell cannot answer hidden commands while another program owns the terminal.
 This pairs well with `api.waitFor()` when a visible pane starts a server and the script needs to wait until it is ready.
 
 ```ts
 const server = api.pane("server");
+const environment = await server.getEnv();
 await server.sendLine("npm run dev");
 
 await api.waitFor("server ready", async () => {
-  const cwd = await server.cwd();
-  const result = await api.node.exec("curl", ["-fsS", "http://127.0.0.1:5173"], {
-    cwd,
+  const result = await api.sidecar.exec("curl", ["-fsS", "http://127.0.0.1:5173"], {
+    environment,
     reject: false,
     timeoutMs: 1000,
   });
