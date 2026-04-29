@@ -9,12 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Replaced implicit hidden lifecycle pane commands with explicit `pane.hidden.*` controls.
+- Commands in `setup` and `teardown` are not hidden by default anymore, but require you to explicitly use
+  the new `hidden` API (see "Added").
+  If you don't use hidden during setup, the terminal will have content pre-populated when you start the recording.
 - Renamed `api.node.exec()` to `api.sidecar.exec()`.
 
 ### Added
 
+- Added hidden pane commands that run in the terminal of the pane, but are not shown in the gui.
+  They can be accessed vai `pane.hidden.*` controls.
 - Added `pane.getEnv()` snapshots for running sidecar processes with a pane's exported environment and cwd.
+- `pane.sidecar.exec` gained the option to pass `environment` as an option.
+  The environment can be obtained for a pane using `pane.getEnv()`.
+  This allows a sidecar to inherit environmental variables and the current working directory.
 
 ## [0.3.0] - 2026-04-28
 
