@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { stripVTControlCharacters } from "node:util";
 import { spawn, type IPty } from "node-pty";
 import { normalizeExecCapture } from "./normalize.ts";
 import { typingDelays } from "./typing-delays.ts";
@@ -65,6 +64,8 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
 
   const promptMarker = `TD_PROMPT:${randomUUID()}`;
   const promptMarkerVariable = `TERMDEM_PROMPT_MARKER_${randomUUID().replaceAll("-", "_")}`;
+  const bootstrapPrompt = `TD_BOOTSTRAP:${randomUUID()}> `;
+  const promptSetupMarker = `TD_PROMPT_SETUP:${randomUUID()}`;
   const cwd = options.cwd ?? process.cwd();
   const shellArgs = ["--noprofile", "--norc", "-i"];
   const pty = spawn(shell, shellArgs, {
@@ -81,7 +82,7 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
       MANPAGER: "cat",
       PAGER: "cat",
       TERM: "xterm-256color",
-      PS1: prompt,
+      PS1: bootstrapPrompt,
       PROMPT_COMMAND: "",
     },
   });
@@ -91,6 +92,8 @@ export async function createPaneSession(options: PaneSessionOptions = {}): Promi
     prompt,
     promptMarker,
     promptMarkerVariable,
+    bootstrapPrompt,
+    promptSetupMarker,
     cwd,
     options.onOutput,
   );
@@ -103,8 +106,9 @@ class NodePtyPaneSession implements PaneSession {
   private readonly prompt: string;
   private readonly promptMarker: string;
   private readonly promptMarkerVariable: string;
+  private readonly bootstrapPrompt: string;
+  private readonly promptSetupMarker: string;
   private readonly onOutput: ((chunk: string) => void) | undefined;
-  private readonly promptPattern: RegExp;
   private readonly outputListener;
   private actionQueue = Promise.resolve();
   private dataBuffer = "";
@@ -122,6 +126,8 @@ class NodePtyPaneSession implements PaneSession {
     prompt: string,
     promptMarker: string,
     promptMarkerVariable: string,
+    bootstrapPrompt: string,
+    promptSetupMarker: string,
     cwd: string,
     onOutput?: (chunk: string) => void,
   ) {
@@ -129,9 +135,10 @@ class NodePtyPaneSession implements PaneSession {
     this.prompt = prompt;
     this.promptMarker = promptMarker;
     this.promptMarkerVariable = promptMarkerVariable;
+    this.bootstrapPrompt = bootstrapPrompt;
+    this.promptSetupMarker = promptSetupMarker;
     this.currentCwd = cwd;
     this.onOutput = onOutput;
-    this.promptPattern = new RegExp(`^${escapeRegExp(prompt)}$`, "u");
     this.outputListener = this.pty.onData((data) => {
       this.handlePtyData(data);
     });
@@ -144,11 +151,11 @@ class NodePtyPaneSession implements PaneSession {
     await this.waitForPrompt();
     this.dataBuffer = "";
     this.pty.write(`${this.buildBootstrapCommand()}\r`);
-    await this.waitForPromptMarker();
+    const renderedPrompt = await this.waitForPromptMarker();
 
     this.bootstrapping = false;
     this.dataBuffer = "";
-    this.emitVisible(this.prompt);
+    this.emitVisible(stripLeadingBracketedPasteMode(renderedPrompt));
   }
 
   private buildBootstrapCommand() {
@@ -160,6 +167,7 @@ class NodePtyPaneSession implements PaneSession {
       `${this.promptMarkerVariable}=${shQuote(this.promptMarker)}`,
       `PS1=${shQuote(promptRecipe)}`,
       "PROMPT_COMMAND=",
+      `printf '\\036%s\\036' ${shQuote(this.promptSetupMarker)}`,
     ].join("; ");
   }
 
@@ -382,7 +390,6 @@ class NodePtyPaneSession implements PaneSession {
     }
 
     this.alternateScreenActive = nextAlternateScreenState(this.alternateScreenActive, text);
-    const visibleText = stripVTControlCharacters(text);
     const suppressHiddenPromptOutput = this.hiddenOutputUntilPrompt > 0;
 
     if (
@@ -395,13 +402,6 @@ class NodePtyPaneSession implements PaneSession {
     if (this.captureActive) {
       this.pendingExec?.rawChunks.push(text);
     }
-
-    if (this.completedExec && visibleText.includes(this.prompt)) {
-      const completedExec = this.completedExec;
-      clearTimeout(completedExec.timer);
-      this.completedExec = null;
-      completedExec.resolve(completedExec.result);
-    }
   }
 
   private handleMarker(marker: string) {
@@ -410,6 +410,12 @@ class NodePtyPaneSession implements PaneSession {
       this.currentCwd = cwd;
       if (this.hiddenOutputUntilPrompt > 0) {
         this.hiddenOutputUntilPrompt -= 1;
+      }
+      if (this.completedExec) {
+        const completedExec = this.completedExec;
+        clearTimeout(completedExec.timer);
+        this.completedExec = null;
+        completedExec.resolve(completedExec.result);
       }
       return;
     }
@@ -432,9 +438,7 @@ class NodePtyPaneSession implements PaneSession {
     this.captureActive = false;
     const [, , statusText = "1"] = marker.split(":");
     this.pendingExec = null;
-    const normalized = normalizeExecCapture(pendingExec.rawChunks.join(""), {
-      promptPattern: this.promptPattern,
-    });
+    const normalized = normalizeExecCapture(pendingExec.rawChunks.join(""));
     const result: ExecResult = {
       command: pendingExec.command,
       exitCode: Number.parseInt(statusText, 10),
@@ -471,13 +475,13 @@ class NodePtyPaneSession implements PaneSession {
           return;
         }
 
-        if (this.dataBuffer.includes(this.prompt)) {
+        if (this.dataBuffer.includes(this.bootstrapPrompt)) {
           resolve();
           return;
         }
 
         if (Date.now() - start >= timeoutMs) {
-          reject(new Error(`Timed out waiting for prompt ${this.prompt}`));
+          reject(new Error("Timed out waiting for shell bootstrap prompt"));
           return;
         }
 
@@ -491,17 +495,22 @@ class NodePtyPaneSession implements PaneSession {
   private waitForPromptMarker(timeoutMs = 2000) {
     const start = Date.now();
 
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<string>((resolve, reject) => {
       const tick = () => {
         if (this.closed) {
           reject(new Error("Pane session closed during bootstrap"));
           return;
         }
 
-        const cwd = findPromptCwdMarker(this.dataBuffer, this.promptMarker);
-        if (cwd !== null) {
-          this.currentCwd = cwd;
-          resolve();
+        const promptMarker = findPromptMarker(this.dataBuffer, this.promptMarker);
+        const setupMarkerEnd = findMarkerEnd(this.dataBuffer, this.promptSetupMarker);
+        if (
+          promptMarker !== null &&
+          setupMarkerEnd !== null &&
+          setupMarkerEnd <= promptMarker.start
+        ) {
+          this.currentCwd = promptMarker.cwd;
+          resolve(this.dataBuffer.slice(setupMarkerEnd, promptMarker.start));
           return;
         }
 
@@ -571,11 +580,7 @@ function shQuote(value: string) {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-}
-
-function findPromptCwdMarker(text: string, promptMarker: string) {
+function findPromptMarker(text: string, promptMarker: string) {
   const markerPrefix = `\u001e${promptMarker}:`;
   const markerStart = text.indexOf(markerPrefix);
   if (markerStart === -1) {
@@ -587,7 +592,29 @@ function findPromptCwdMarker(text: string, promptMarker: string) {
     return null;
   }
 
-  return parsePromptCwdMarker(text.slice(markerStart + 1, markerEnd), promptMarker);
+  const cwd = parsePromptCwdMarker(text.slice(markerStart + 1, markerEnd), promptMarker);
+  if (cwd === null) {
+    return null;
+  }
+
+  return { cwd, start: markerStart };
+}
+
+function findMarkerEnd(text: string, marker: string) {
+  const encodedMarker = `\u001e${marker}\u001e`;
+  const markerStart = text.indexOf(encodedMarker);
+
+  return markerStart === -1 ? null : markerStart + encodedMarker.length;
+}
+
+function stripLeadingBracketedPasteMode(text: string) {
+  const sequence = `${String.fromCharCode(27)}[?2004h`;
+  let start = 0;
+  while (text.startsWith(sequence, start)) {
+    start += sequence.length;
+  }
+
+  return text.slice(start);
 }
 
 function parsePromptCwdMarker(marker: string, promptMarker: string) {

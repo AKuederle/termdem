@@ -135,6 +135,29 @@ test("pane sessions reject empty prompts", async () => {
   );
 });
 
+test("pane sessions support Bash expansions in configured prompts", async () => {
+  const cwd = await createTempDir();
+  const prompt = "[$TERM \\w $(printf expanded)] $ ";
+  const visibleOutput: string[] = [];
+  const session = await createPaneSession({
+    cwd,
+    onOutput(chunk) {
+      visibleOutput.push(chunk);
+    },
+    prompt,
+  });
+
+  try {
+    const result = await session.exec("cd / && printf ready", { typeDelayMs: 0 });
+
+    expect(result.text).toBe("ready");
+    expect(visibleOutput.join("")).toContain(`[xterm-256color ${cwd} expanded] $ `);
+    expect(visibleOutput.join("")).toContain("[xterm-256color / expanded] $ ");
+  } finally {
+    await session.close();
+  }
+});
+
 test("pane sessions wait for bootstrap prompt markers before exposing output", async () => {
   const visibleOutput: string[] = [];
   const session = await createPaneSession({

@@ -176,6 +176,16 @@ export type TerminalWorkspaceDefinition = {
    */
   name: string;
   /**
+   * Shell prompt displayed in this pane.
+   *
+   * The value is interpreted as Bash `PS1`, including prompt escapes, parameter
+   * expansion, command substitution, and arithmetic expansion. It is reevaluated
+   * before each prompt using the pane's current shell variables.
+   *
+   * Defaults to `(${name}) $ `.
+   */
+  prompt?: string;
+  /**
    * Working directory provider for this terminal.
    *
    * Share the same `Dir` or `TmpDir` instance between definitions when panes should

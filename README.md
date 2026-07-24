@@ -165,6 +165,37 @@ panes: [
 ];
 ```
 
+### Configure pane prompts
+
+Set `prompt` independently of a pane's `name` when its title should describe the pane's role while its
+shell prompt identifies an environment, peer, or working directory.
+The value uses Bash [`PS1` syntax](https://www.gnu.org/software/bash/manual/html_node/Controlling-the-Prompt.html)
+and is expanded again before every prompt.
+
+```ts
+panes: [
+  { name: "files", prompt: "($USER@\\h \\w) \\$ ", pwd: workspace },
+  { name: "watch", prompt: "(client2) \\$ ", pwd: workspace },
+];
+```
+
+Prompt strings support Bash escapes such as `\u`, `\h`, `\w`, `\W`, and `\$`, along with parameter
+expansion (`$NAME` and `${NAME}`), arithmetic expansion (`$((...))`), and command substitution (`$(...)`
+or backticks).
+Command substitutions execute each time Bash displays the prompt, so only use trusted commands.
+
+The prompt can read:
+
+- All environment variables inherited from the process running Termdem.
+- Bash variables such as `PWD`, `UID`, `EUID`, `HOSTNAME`, `BASH_VERSION`, and `SHLVL`.
+- Variables set by earlier commands in that pane; for example, `export PEER=client2` updates `$PEER` in
+  subsequent prompts.
+- Termdem's terminal overrides: `TERM=xterm-256color`, `PAGER=cat`, `GIT_PAGER=cat`, `GH_PAGER=cat`,
+  `DELTA_PAGER=cat`, `MANPAGER=cat`, and `LESS=FRX`.
+
+Termdem reserves `PS1` and `PROMPT_COMMAND` for prompt rendering and command-completion detection.
+Customize the pane through its `prompt` definition instead of assigning either variable from pane commands.
+
 ### Run Setup and Teardown
 
 Directory `setup` and `teardown` prepare files before panes start, while demo-level `setup` and `teardown` use the same API as `script`.

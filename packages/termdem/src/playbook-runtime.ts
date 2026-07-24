@@ -101,7 +101,7 @@ export class PlaybookRuntime<Name extends string = string> {
       }
 
       const workspace = await createTerminalWorkspace(terminal);
-      const prompt = `(${terminal.name}) $ `;
+      const prompt = terminal.prompt ?? `(${terminal.name}) $ `;
       const shell = this.options.shell ?? process.env.TERMDEM_SHELL ?? "/bin/bash";
       const size = this.paneSizes.get(terminal.name) ?? { cols: 20, rows: 8 };
       const session = await createPaneSession({

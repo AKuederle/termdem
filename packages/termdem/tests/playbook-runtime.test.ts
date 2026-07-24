@@ -16,6 +16,34 @@ afterEach(async () => {
   );
 });
 
+test("playbook runtime supports pane prompts independent of pane names", async () => {
+  const paneMetadata: Array<{ pane: string; prompt: string }> = [];
+  const runtime = new PlaybookRuntime({
+    onPaneMeta({ pane, prompt }) {
+      paneMetadata.push({ pane, prompt });
+    },
+    terminalDefinitions: [
+      { name: "files", prompt: "(client2) $ ", pwd: new TmpDir({}) },
+      { name: "watch", pwd: new TmpDir({}) },
+    ],
+    typeDelayMs: 0,
+  });
+  let filesOutput = "";
+  let watchOutput = "";
+
+  await runtime.run(async (api) => {
+    filesOutput = (await api.pane("files").exec("printf files-ready")).text;
+    watchOutput = (await api.pane("watch").exec("printf watch-ready")).text;
+  });
+
+  expect(paneMetadata).toEqual([
+    { pane: "files", prompt: "(client2) $ " },
+    { pane: "watch", prompt: "(watch) $ " },
+  ]);
+  expect(filesOutput).toBe("files-ready");
+  expect(watchOutput).toBe("watch-ready");
+});
+
 test("pane sessions sendLine visibly starts a command without waiting for prompt", async () => {
   const visibleOutput: string[] = [];
   const session = await createPaneSession({
