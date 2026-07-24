@@ -1,0 +1,3 @@
+review_guidelines = """
+Allow small public-interface breaks only when they include a clear migration guide. Require all in-repository consumers to be updated with internal refactors. Flag larger public-interface breaks unless they have explicit user approval and prominent downstream documentation.
+"""
