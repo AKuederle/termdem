@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-24
+
+### Added
+
+- Added an optional `prompt` to pane definitions so shell prompts can identify an environment or peer
+  independently of the pane title.
+
+### Fixed
+
+- Command completion detection now follows Bash-expanded prompts, including prompts that change with shell
+  variables or the working directory.
+
 ## [0.4.0] - 2026-04-29
 
 ### Changed
@@ -24,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added hidden pane commands that run in the terminal of the pane, but are not shown in the gui.
-  They can be accessed vai `pane.hidden.*` controls.
+  They can be accessed via `pane.hidden.*` controls.
 - Added `pane.getEnv()` snapshots for running sidecar processes with a pane's exported environment and cwd.
 - `pane.sidecar.exec` gained the option to pass `environment` as an option.
   The environment can be obtained for a pane using `pane.getEnv()`.
@@ -52,7 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public npm release of `@akuederle/termdem`.
 - Added terminal demo scripting, preview, recording, and multi-pane rendering support.
 
-[unreleased]: https://github.com/AKuederle/termdem/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/AKuederle/termdem/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/AKuederle/termdem/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/AKuederle/termdem/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/AKuederle/termdem/compare/v0.1.0...v0.3.0
 [0.1.0]: https://github.com/AKuederle/termdem/releases/tag/v0.1.0
